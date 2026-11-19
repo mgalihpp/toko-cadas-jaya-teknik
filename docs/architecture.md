@@ -5,7 +5,17 @@ src/
   app/                      Rute Next.js (App Router) dan route handler
     api/auth/[...all]/      Handler Better Auth
     api/trpc/[trpc]/        Handler tRPC
+  (store)/                  Grup rute sisi pelanggan (header + footer toko)
+  (auth)/                   Masuk dan daftar customer
+  (admin)/admin/            Panel admin; (panel)/ berlayout sidebar, masuk/ tanpa sidebar
   components/ui/            Komponen shadcn (hasil generate, jangan diedit kecuali perlu)
+  components/layout/        Kerangka halaman: header toko, footer, shell admin
+  components/shared/        Komponen lintas fitur (mis. EmptyState, PageHeader)
+  features/<nama>/          Satu folder per fitur
+    components/             Komponen khusus fitur
+    hooks/                  Hook fitur (pembungkus tRPC query/mutation)
+    schemas.ts              Skema zod form (bila ada)
+    index.ts                API publik fitur; fitur lain hanya impor dari sini
   hooks/                    Hook React sisi klien
   lib/                      Util yang aman dipakai di klien dan server
     auth-client.ts          Klien Better Auth
@@ -43,6 +53,9 @@ docs/                       Dokumentasi teknologi dan arsitektur
 ```
 
 ## Aturan dependensi
+
+- `app/**/page.tsx` tipis: ambil data awal bila perlu, lalu render komponen dari `features/<nama>`.
+- Fitur tidak mengimpor isi dalam fitur lain, hanya lewat `features/<nama>/index.ts`.
 
 - `app` dan `components` boleh memakai `trpc/` dan `lib/`. Jangan mengimpor `server/` dari komponen klien.
 - `server/api/routers` memanggil `server/services` untuk aturan bisnis yang dipakai lebih dari satu router, dan `server/db` untuk query.
