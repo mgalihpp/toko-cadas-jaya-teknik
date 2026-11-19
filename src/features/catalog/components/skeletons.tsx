@@ -4,11 +4,12 @@ import { CONTAINER } from "./container";
 
 export function ProductCardSkeleton() {
   return (
-    <div className="flex flex-col gap-3.5" aria-hidden>
-      <Skeleton className="aspect-[15/13] w-full rounded-[14px] bg-ink-100" />
-      <Skeleton className="h-2.5 w-20 rounded bg-ink-100" />
-      <Skeleton className="h-3.5 w-full rounded bg-ink-200" />
-      <Skeleton className="h-4.5 w-28 rounded bg-ink-100" />
+    <div className="flex flex-col gap-3 rounded-xl border border-border p-3" aria-hidden>
+      <Skeleton className="aspect-[4/3] w-full rounded-lg bg-ink-100" />
+      <Skeleton className="h-3 w-32 rounded bg-ink-100" />
+      <Skeleton className="h-[2.625rem] w-full rounded bg-ink-200" />
+      <Skeleton className="h-5 w-28 rounded bg-ink-100" />
+      <Skeleton className="h-10 w-full rounded-lg bg-ink-100" />
     </div>
   );
 }
