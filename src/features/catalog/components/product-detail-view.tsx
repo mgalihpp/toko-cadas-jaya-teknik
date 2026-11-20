@@ -14,77 +14,61 @@ import { ProductBuyBox } from "./product-buy-box";
 import { ProductCard } from "./product-card";
 import { ProductGallery } from "./product-gallery";
 
-const CONDITION_COPY = {
-  baru: [
-    "Unit baru tersegel dari distributor.",
-    "Garansi resmi mengikuti ketentuan merek.",
-    "Nota pembelian disertakan untuk klaim garansi.",
-  ],
-  bekas: [
-    "Unit bekas sudah dicek dan diuji nyala sebelum dipajang.",
-    "Foto di halaman ini adalah foto unit asli dari beberapa sisi.",
-    "Stok bekas biasanya hanya satu unit dan dikunci begitu kamu checkout.",
-  ],
-} as const;
-
 function ProductInfoTabs({ product }: { product: ProductDetail }) {
   const specs = Object.entries(product.specs ?? {}).filter(([key, value]) => key && value);
   const trigger =
-    "h-auto! w-full flex-none justify-start rounded-lg border-0 px-4 py-3 text-[15px] font-medium text-ink-600 data-active:bg-ink-100 data-active:font-semibold data-active:text-ink-900 data-active:shadow-none";
+    "h-auto! flex-none rounded-none border-0 px-0 pb-3.5 text-[15px] font-medium text-ink-500 data-active:font-bold data-active:text-ink-900";
   return (
-    <Tabs
-      defaultValue={specs.length > 0 ? "spesifikasi" : "deskripsi"}
-      orientation="vertical"
-      className="flex-col gap-6 lg:flex-row lg:gap-16"
-    >
+    <Tabs defaultValue="deskripsi" className="gap-6">
       <TabsList
         variant="line"
-        className="h-auto w-full flex-row gap-1 overflow-x-auto p-0 lg:w-[260px] lg:shrink-0 lg:flex-col lg:self-start lg:overflow-visible"
+        className="h-auto w-full justify-start gap-8 overflow-x-auto border-b border-ink-200 p-0"
       >
-        <TabsTrigger value="spesifikasi" className={cn(trigger, "lg:w-full")}>
-          Spesifikasi
-        </TabsTrigger>
-        <TabsTrigger value="deskripsi" className={cn(trigger, "lg:w-full")}>
+        <TabsTrigger value="deskripsi" className={trigger}>
           Deskripsi
         </TabsTrigger>
-        <TabsTrigger value="kondisi" className={cn(trigger, "lg:w-full")}>
-          Kondisi lengkap
+        <TabsTrigger value="spesifikasi" className={trigger}>
+          Spesifikasi
+        </TabsTrigger>
+        <TabsTrigger value="pengiriman" className={trigger}>
+          Pengiriman dan pembayaran
         </TabsTrigger>
       </TabsList>
+      <TabsContent value="deskripsi" className="min-w-0">
+        {product.description ? (
+          <p className="max-w-prose text-[15px] leading-relaxed whitespace-pre-line text-ink-600">
+            {product.description}
+          </p>
+        ) : (
+          <p className="text-sm text-ink-500">Deskripsi belum diisi untuk produk ini.</p>
+        )}
+      </TabsContent>
       <TabsContent value="spesifikasi" className="min-w-0">
         {specs.length > 0 ? (
-          <dl className="flex flex-col">
-            {specs.map(([key, value]) => (
+          <dl className="flex max-w-2xl flex-col">
+            {specs.map(([key, value], i) => (
               <div
                 key={key}
-                className="flex flex-col gap-1 border-b border-ink-200 py-4 sm:flex-row sm:gap-6"
+                className={cn(
+                  "flex items-center justify-between gap-6 px-3.5 py-3 text-sm",
+                  i % 2 === 0 && "bg-ink-50"
+                )}
               >
-                <dt className="text-sm text-ink-500 sm:w-[280px] sm:shrink-0">{key}</dt>
-                <dd className="text-sm font-medium text-ink-900">{value}</dd>
+                <dt className="text-ink-500">{key}</dt>
+                <dd className="text-right font-semibold text-ink-900">{value}</dd>
               </div>
             ))}
           </dl>
         ) : (
-          <p className="py-4 text-sm text-ink-500">Spesifikasi belum diisi untuk produk ini.</p>
+          <p className="text-sm text-ink-500">Spesifikasi belum diisi untuk produk ini.</p>
         )}
       </TabsContent>
-      <TabsContent value="deskripsi" className="min-w-0">
-        {product.description ? (
-          <p className="max-w-prose py-4 text-[15px] leading-relaxed whitespace-pre-line text-ink-700">
-            {product.description}
-          </p>
-        ) : (
-          <p className="py-4 text-sm text-ink-500">Deskripsi belum diisi untuk produk ini.</p>
-        )}
-      </TabsContent>
-      <TabsContent value="kondisi" className="min-w-0">
-        <ul className="flex flex-col gap-3 py-4">
-          {CONDITION_COPY[product.condition].map((line) => (
-            <li key={line} className="flex gap-2.5 text-[15px] text-ink-700">
-              <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-600" aria-hidden />
-              {line}
-            </li>
-          ))}
+      <TabsContent value="pengiriman" className="min-w-0">
+        <ul className="flex max-w-prose flex-col gap-3 text-[15px] text-ink-600">
+          <li>Ambil di toko: siap setelah pembayaran dikonfirmasi Owner.</li>
+          <li>Dikirim: ongkir dikonfirmasi Owner setelah pesanan dibuat.</li>
+          <li>Pembayaran tunai saat serah terima, atau transfer ke rekening toko dan unggah bukti.</li>
+          <li>Pesanan transfer tanpa bukti dalam 24 jam dibatalkan otomatis dan stok dilepas.</li>
         </ul>
       </TabsContent>
     </Tabs>
@@ -128,7 +112,7 @@ export function ProductDetailView({ slug }: { slug: string }) {
   const { data: product } = useSuspenseQuery(trpc.catalog.productBySlug.queryOptions({ slug }));
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col pb-24 lg:pb-0">
       <nav
         aria-label="Breadcrumb"
         className={cn(CONTAINER, "flex flex-wrap items-center gap-1.5 pt-7 text-[13px]")}
@@ -156,7 +140,7 @@ export function ProductDetailView({ slug }: { slug: string }) {
       <div
         className={cn(
           CONTAINER,
-          "grid gap-8 pt-7 pb-14 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-16 lg:pb-[72px]"
+          "grid gap-8 pt-6 pb-10 lg:grid-cols-[minmax(0,640px)_minmax(0,1fr)] lg:gap-14 lg:pb-14"
         )}
       >
         <ProductGallery images={product.images} name={product.name} condition={product.condition} />

@@ -19,55 +19,24 @@ export function ProductGallery({
 }) {
   const [index, setIndex] = useState(0);
   const total = images.length;
+  const used = condition === "bekas";
   const current = images[Math.min(index, Math.max(total - 1, 0))];
   const go = (delta: number) => setIndex((i) => (i + delta + total) % total);
 
-  const note =
-    condition === "bekas"
-      ? `Foto unit asli, ${index + 1} dari ${total}`
-      : `Foto ${index + 1} dari ${total}`;
-
   return (
-    <div className="flex flex-col-reverse gap-3 lg:flex-row lg:gap-4">
-      {total > 1 ? (
-        <div
-          className="flex gap-3 overflow-x-auto pb-1 lg:max-h-[580px] lg:flex-col lg:overflow-y-auto lg:overflow-x-visible lg:pb-0"
-          role="tablist"
-          aria-label="Foto produk"
-        >
-          {images.map((image, i) => (
-            <button
-              key={image.id}
-              type="button"
-              role="tab"
-              aria-selected={i === index}
-              aria-label={`Foto ${i + 1}`}
-              onClick={() => setIndex(i)}
-              className={cn(
-                "size-16 shrink-0 overflow-hidden rounded-[10px] border-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:size-[84px]",
-                i === index ? "border-ink-900" : "border-ink-200 hover:border-ink-300"
-              )}
-            >
-              <ProductImage src={image.url} alt="" className="size-full" />
-            </button>
-          ))}
-        </div>
-      ) : null}
-      <div className="relative min-w-0 flex-1 overflow-hidden rounded-[20px] bg-ink-100">
+    <div className="flex min-w-0 flex-col gap-3">
+      <div className="relative overflow-hidden rounded-xl bg-ink-100">
         <ProductImage
           src={current?.url}
           alt={total > 0 ? `${name}, foto ${index + 1}` : name}
           loading="eager"
-          className="aspect-square w-full lg:aspect-auto lg:h-[580px]"
+          className={cn(
+            "aspect-[4/3] w-full lg:aspect-auto",
+            used ? "lg:h-[400px]" : "lg:h-[480px]"
+          )}
         />
-        {total > 0 ? (
-          <span className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 rounded-full bg-ink-900/80 px-2.5 py-1.5 text-xs font-medium text-white">
-            <CameraIcon className="size-3.5" />
-            {note}
-          </span>
-        ) : null}
         {total > 1 ? (
-          <div className="absolute right-4 bottom-4 flex gap-2 lg:hidden">
+          <div className="absolute inset-x-3 top-1/2 flex -translate-y-1/2 justify-between lg:hidden">
             <button
               type="button"
               aria-label="Foto sebelumnya"
@@ -87,6 +56,52 @@ export function ProductGallery({
           </div>
         ) : null}
       </div>
+
+      {total > 1 ? (
+        <>
+          <div className="flex items-center justify-center gap-1.5 lg:hidden" aria-hidden>
+            {images.map((image, i) => (
+              <span
+                key={image.id}
+                className={cn(
+                  "h-1.5 rounded-full transition-all",
+                  i === index ? "w-[18px] bg-brand-600" : "w-1.5 bg-ink-300"
+                )}
+              />
+            ))}
+          </div>
+          <div
+            className={cn("hidden gap-2.5 lg:grid", used ? "grid-cols-3" : "grid-cols-5")}
+            role="tablist"
+            aria-label="Foto produk"
+          >
+            {images.slice(0, used ? 6 : 5).map((image, i) => (
+              <button
+                key={image.id}
+                type="button"
+                role="tab"
+                aria-selected={i === index}
+                aria-label={`Foto ${i + 1}`}
+                onClick={() => setIndex(i)}
+                className={cn(
+                  "overflow-hidden rounded-lg border outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  used ? "h-[150px]" : "h-[92px]",
+                  i === index ? "border-2 border-brand-600" : "border-ink-200 hover:border-ink-300"
+                )}
+              >
+                <ProductImage src={image.url} alt="" className="size-full" />
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {used && total > 0 ? (
+        <p className="flex items-center gap-1.5 text-xs text-ink-500">
+          <CameraIcon className="size-3.5" />
+          Foto kondisi aktual barang yang Anda beli, bukan foto katalog.
+        </p>
+      ) : null}
     </div>
   );
 }
