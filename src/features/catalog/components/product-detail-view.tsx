@@ -22,7 +22,7 @@ function ProductInfoTabs({ product }: { product: ProductDetail }) {
     <Tabs defaultValue="deskripsi" className="gap-6">
       <TabsList
         variant="line"
-        className="h-auto w-full justify-start gap-8 overflow-x-auto border-b border-ink-200 p-0"
+        className="h-auto! w-full justify-start gap-6 border-b sm:gap-8 border-ink-200 p-0"
       >
         <TabsTrigger value="deskripsi" className={trigger}>
           Deskripsi
