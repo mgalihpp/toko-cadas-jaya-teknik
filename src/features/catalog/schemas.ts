@@ -8,7 +8,7 @@ export const SORT_OPTIONS = [
 
 export type CatalogSort = (typeof SORT_OPTIONS)[number]["value"];
 
-export const CATALOG_PAGE_SIZE = 12;
+export const CATALOG_PAGE_SIZE = 20;
 
 export type CatalogFilters = {
   q?: string;

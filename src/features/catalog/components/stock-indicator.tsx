@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
 
+export const LIMITED_STOCK = 3;
+
 export type StockLevel = "tersedia" | "terakhir" | "habis";
 
 export function stockLevel(available: number): StockLevel {
@@ -17,8 +19,8 @@ const TONE: Record<StockLevel, string> = {
 export function stockLabel(available: number): string {
   const level = stockLevel(available);
   if (level === "habis") return "Habis";
-  if (level === "terakhir") return "Tersisa 1";
-  return `Stok ${available}`;
+  if (level === "terakhir" || available <= LIMITED_STOCK) return "Stok terbatas";
+  return "Tersedia";
 }
 
 export function StockIndicator({

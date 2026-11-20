@@ -6,7 +6,7 @@
 
 @theme inline {
   --font-sans: var(--font-inter);
-  --font-heading: var(--font-space-grotesk);
+  --font-heading: var(--font-plus-jakarta);
   --font-mono: var(--font-geist-mono);
 
   --color-background: var(--background);

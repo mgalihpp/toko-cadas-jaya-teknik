@@ -6,10 +6,8 @@ import {
   LogOutIcon,
   MenuIcon,
   ReceiptTextIcon,
-  SearchIcon,
   ShoppingBagIcon,
 } from "lucide-react";
-import Form from "next/form";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense } from "react";
@@ -117,28 +115,6 @@ function NavLinks({ variant }: { variant: "desktop" | "mobile" }) {
   );
 }
 
-function SearchBox({ className }: { className?: string }) {
-  return (
-    <Form
-      action="/produk"
-      role="search"
-      className={cn(
-        "flex h-10 items-center gap-2 rounded-full bg-ink-100 px-3.5 focus-within:ring-2 focus-within:ring-brand-200",
-        className
-      )}
-    >
-      <SearchIcon className="size-4 shrink-0 text-ink-500" aria-hidden />
-      <input
-        type="search"
-        name="q"
-        placeholder="Cari bor, gerinda, kompresor"
-        aria-label="Cari produk"
-        className="w-full min-w-0 bg-transparent text-[13px] text-ink-900 outline-none placeholder:text-ink-500"
-      />
-    </Form>
-  );
-}
-
 function CartButton() {
   const count = useCartCount();
   return (
@@ -166,10 +142,7 @@ function AccountMenu() {
   if (!session) {
     return (
       <div className="hidden items-center gap-2 sm:flex">
-        <Button asChild variant="ghost" className="h-10 rounded-lg px-4 text-ink-700">
-          <Link href="/daftar">Daftar</Link>
-        </Button>
-        <Button asChild className="h-10 rounded-lg bg-ink-900 px-[18px] text-white hover:bg-ink-800">
+        <Button asChild className="h-10 rounded-lg bg-brand-600 px-[18px] text-white hover:bg-brand-700">
           <Link href="/masuk">Masuk</Link>
         </Button>
       </div>
@@ -231,14 +204,9 @@ function MobileAccountLinks() {
 
   if (!session) {
     return (
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid gap-2">
         <SheetClose asChild>
-          <Button asChild variant="outline" className="h-10">
-            <Link href="/daftar">Daftar</Link>
-          </Button>
-        </SheetClose>
-        <SheetClose asChild>
-          <Button asChild className="h-10 bg-ink-900 text-white hover:bg-ink-800">
+          <Button asChild className="h-10 bg-brand-600 text-white hover:bg-brand-700">
             <Link href="/masuk">Masuk</Link>
           </Button>
         </SheetClose>
@@ -301,7 +269,6 @@ function MobileMenu() {
           <SiteLogo />
         </SheetHeader>
         <div className="flex flex-col gap-6 p-4">
-          <SearchBox />
           <nav className="flex flex-col gap-1" aria-label="Navigasi utama">
             <NavLinks variant="mobile" />
           </nav>
@@ -317,13 +284,12 @@ function MobileMenu() {
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-ink-200 bg-white">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 md:h-[76px] lg:px-10">
+      <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6 md:h-[76px] lg:px-8">
         <SiteLogo />
         <nav className="hidden items-center gap-8 md:flex" aria-label="Navigasi utama">
           <NavLinks variant="desktop" />
         </nav>
         <div className="flex items-center gap-3">
-          <SearchBox className="hidden w-[280px] lg:flex" />
           <CartButton />
           <AccountMenu />
           <MobileMenu />

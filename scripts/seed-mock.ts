@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { STORE_ADDRESS, STORE_OPENING_HOURS, STORE_PHONE } from "@/features/contact/store-location";
 import { slugify } from "@/lib/slug";
 import { db } from "@/server/db";
 import { categories, productImages, products, storeSettings } from "@/server/db/schema";
@@ -35,17 +36,17 @@ async function main() {
     .values({
       id: 1,
       bankAccounts: [{ bank: "BCA", number: "0000000000", holder: "Cadas Jaya Teknik (contoh)" }],
-      address: "Jl. Contoh No. 12, Cadas, Tangerang (alamat contoh)",
-      phone: "0812-0000-0000",
-      openingHours: "Senin - Sabtu: 08.00 - 17.00\nMinggu: Tutup",
+      address: STORE_ADDRESS,
+      phone: STORE_PHONE,
+      openingHours: STORE_OPENING_HOURS,
     })
     .onConflictDoUpdate({
       target: storeSettings.id,
       set: {
         bankAccounts: [{ bank: "BCA", number: "0000000000", holder: "Cadas Jaya Teknik (contoh)" }],
-        address: "Jl. Contoh No. 12, Cadas, Tangerang (alamat contoh)",
-        phone: "0812-0000-0000",
-        openingHours: "Senin - Sabtu: 08.00 - 17.00\nMinggu: Tutup",
+        address: STORE_ADDRESS,
+        phone: STORE_PHONE,
+        openingHours: STORE_OPENING_HOURS,
       },
     });
 

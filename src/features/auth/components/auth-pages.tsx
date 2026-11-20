@@ -9,17 +9,9 @@ import { RegisterForm } from "./register-form";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-const LOGIN_IMAGE =
-  "https://images.unsplash.com/photo-1569783899817-a49d2d25287c?auto=format&fit=crop&w=1080&q=80";
-const REGISTER_IMAGE =
-  "https://images.unsplash.com/photo-1563439633552-1d4b7be86090?auto=format&fit=crop&w=1080&q=80";
-
 export function LoginPage({ searchParams }: { searchParams: SearchParams }) {
   return (
-    <AuthShell
-      imageUrl={LOGIN_IMAGE}
-      quote="Pesan alat hari ini, pantau statusnya sampai barang di tanganmu."
-    >
+    <AuthShell>
       <Suspense fallback={<FormSkeleton fields={2} />}>
         <LoginGate searchParams={searchParams} />
       </Suspense>
@@ -29,10 +21,7 @@ export function LoginPage({ searchParams }: { searchParams: SearchParams }) {
 
 export function RegisterPage({ searchParams }: { searchParams: SearchParams }) {
   return (
-    <AuthShell
-      imageUrl={REGISTER_IMAGE}
-      quote="Satu akun untuk menyimpan keranjang, riwayat pesanan, dan bukti bayar."
-    >
+    <AuthShell>
       <Suspense fallback={<FormSkeleton fields={4} />}>
         <RegisterGate searchParams={searchParams} />
       </Suspense>

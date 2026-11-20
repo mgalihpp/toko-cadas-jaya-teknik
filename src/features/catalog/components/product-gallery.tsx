@@ -31,7 +31,7 @@ export function ProductGallery({
           alt={total > 0 ? `${name}, foto ${index + 1}` : name}
           loading="eager"
           className={cn(
-            "aspect-[4/3] w-full lg:aspect-auto",
+            "aspect-[4/3] w-full object-contain lg:aspect-auto",
             used ? "lg:h-[400px]" : "lg:h-[480px]"
           )}
         />

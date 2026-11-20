@@ -205,7 +205,7 @@ export function ProductBuyBox({ product }: { product: ProductDetail }) {
         </div>
         <Button
           variant="outline"
-          className="h-12 w-full border-ink-900 text-[15px] font-semibold text-ink-900"
+          className="hidden h-12 w-full border-ink-900 text-[15px] font-semibold text-ink-900 lg:inline-flex"
           disabled={soldOut || busy}
           onClick={() => handle("buy")}
         >
@@ -253,12 +253,21 @@ export function ProductBuyBox({ product }: { product: ProductDetail }) {
           onChange={setQuantity}
         />
         <Button
-          className="h-12 flex-1 text-[15px] font-semibold"
+          variant="outline"
+          className="size-12 shrink-0 border-ink-900 p-0 text-ink-900"
+          aria-label="Tambah ke keranjang"
           disabled={soldOut || busy}
           onClick={() => handle("add")}
         >
-          {action === "add" ? <Spinner /> : <ShoppingCartIcon />}
-          {soldOut ? "Stok habis" : "Tambah ke keranjang"}
+          {action === "add" ? <Spinner /> : <ShoppingCartIcon className="size-5" />}
+        </Button>
+        <Button
+          className="h-12 flex-1 text-[15px] font-semibold"
+          disabled={soldOut || busy}
+          onClick={() => handle("buy")}
+        >
+          {action === "buy" ? <Spinner /> : null}
+          {soldOut ? "Stok habis" : "Beli sekarang"}
         </Button>
       </div>
     </div>

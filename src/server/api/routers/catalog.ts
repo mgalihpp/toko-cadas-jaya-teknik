@@ -44,22 +44,35 @@ export const listInput = z.object({
 });
 
 export const catalogRouter = createTRPCRouter({
-  categories: publicProcedure.query(({ ctx }) =>
-    ctx.db
-      .select({
-        id: categories.id,
-        name: categories.name,
-        slug: categories.slug,
-        productCount: count(products.id),
-      })
-      .from(categories)
-      .leftJoin(
-        products,
-        and(eq(products.categoryId, categories.id), eq(products.isActive, true))
-      )
-      .groupBy(categories.id)
-      .orderBy(asc(categories.name))
-  ),
+  categories: publicProcedure.query(async ({ ctx }) => {
+    const [rows, imageRows] = await Promise.all([
+      ctx.db
+        .select({
+          id: categories.id,
+          name: categories.name,
+          slug: categories.slug,
+          productCount: count(products.id),
+        })
+        .from(categories)
+        .leftJoin(
+          products,
+          and(eq(products.categoryId, categories.id), eq(products.isActive, true))
+        )
+        .groupBy(categories.id)
+        .orderBy(asc(categories.name)),
+      ctx.db
+        .select({ categoryId: products.categoryId, url: productImages.url })
+        .from(productImages)
+        .innerJoin(products, eq(products.id, productImages.productId))
+        .where(eq(products.isActive, true))
+        .orderBy(desc(products.createdAt), asc(productImages.position)),
+    ]);
+    const imageByCategory = new Map<string, string>();
+    for (const row of imageRows) {
+      if (!imageByCategory.has(row.categoryId)) imageByCategory.set(row.categoryId, row.url);
+    }
+    return rows.map((row) => ({ ...row, image: imageByCategory.get(row.id) ?? null }));
+  }),
 
   products: publicProcedure.input(listInput).query(async ({ ctx, input }) => {
     const where = and(
@@ -166,7 +179,7 @@ export const catalogRouter = createTRPCRouter({
       .innerJoin(categories, eq(categories.id, products.categoryId))
       .where(eq(products.isActive, true))
       .orderBy(desc(products.createdAt))
-      .limit(8);
+      .limit(10);
     const images = await firstImages(
       ctx.db,
       rows.map((r) => r.id)
