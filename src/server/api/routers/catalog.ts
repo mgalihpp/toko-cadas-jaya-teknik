@@ -179,7 +179,7 @@ export const catalogRouter = createTRPCRouter({
       .innerJoin(categories, eq(categories.id, products.categoryId))
       .where(eq(products.isActive, true))
       .orderBy(desc(products.createdAt))
-      .limit(10);
+      .limit(12);
     const images = await firstImages(
       ctx.db,
       rows.map((r) => r.id)

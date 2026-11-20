@@ -97,7 +97,7 @@ export async function LatestProductsGrid() {
     );
   }
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
       {products.map((product) => (
         <ProductCard key={product.id} product={product} />
       ))}
@@ -107,8 +107,8 @@ export async function LatestProductsGrid() {
 
 export function LatestProductsSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 lg:grid-cols-5">
-      {Array.from({ length: 10 }, (_, i) => (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+      {Array.from({ length: 12 }, (_, i) => (
         <ProductCardSkeleton key={i} />
       ))}
     </div>

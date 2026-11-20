@@ -235,7 +235,7 @@ export function CatalogView({ filters }: { filters: CatalogFilters }) {
           ) : (
             <div
               className={cn(
-                "grid grid-cols-2 gap-x-4 gap-y-8 transition-opacity sm:gap-x-6 lg:grid-cols-4 xl:grid-cols-5",
+                "grid grid-cols-2 gap-x-4 gap-y-8 transition-opacity sm:gap-x-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
                 isPending && "pointer-events-none opacity-60"
               )}
               aria-busy={isPending}

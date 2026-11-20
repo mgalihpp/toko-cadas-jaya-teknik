@@ -4,12 +4,10 @@ import { CONTAINER } from "./container";
 
 export function ProductCardSkeleton() {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border p-3" aria-hidden>
-      <Skeleton className="aspect-[4/3] w-full rounded-lg bg-ink-100" />
-      <Skeleton className="h-3 w-32 rounded bg-ink-100" />
-      <Skeleton className="h-[2.625rem] w-full rounded bg-ink-200" />
+    <div className="flex flex-col gap-2.5" aria-hidden>
+      <Skeleton className="aspect-square w-full rounded-xl bg-ink-100" />
+      <Skeleton className="h-4 w-full rounded bg-ink-200" />
       <Skeleton className="h-5 w-28 rounded bg-ink-100" />
-      <Skeleton className="h-10 w-full rounded-lg bg-ink-100" />
     </div>
   );
 }
@@ -22,7 +20,7 @@ export function ProductGridSkeleton({
   className?: string;
 }) {
   return (
-    <div className={cn("grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 lg:grid-cols-4 xl:grid-cols-5", className)}>
+    <div className={cn("grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5", className)}>
       {Array.from({ length: count }, (_, i) => (
         <ProductCardSkeleton key={i} />
       ))}
