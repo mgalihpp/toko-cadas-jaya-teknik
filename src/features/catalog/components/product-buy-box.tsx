@@ -24,9 +24,9 @@ import { ConditionBadge } from "./condition-badge";
 import { stockLevel } from "./stock-indicator";
 
 const USED_NOTES = [
-  "Sudah dicek dan diuji nyala oleh toko sebelum dipajang",
-  "Foto yang tampil adalah unit asli dari beberapa sisi",
-  "Hanya satu unit, dikunci begitu checkout selesai",
+  "Sudah diuji nyala oleh toko",
+  "Foto adalah unit asli dari beberapa sisi",
+  "Hanya 1 unit, dikunci saat checkout",
 ];
 
 function StockAlert({ available }: { available: number }) {
@@ -46,7 +46,7 @@ function StockAlert({ available }: { available: number }) {
           box: "border-warning-border bg-warning-soft",
           tone: "text-warning",
           title: "Tersisa 1 unit",
-          body: "Unit dikunci untukmu begitu checkout selesai. Pembayaran transfer ditunggu 24 jam.",
+          body: "Dikunci untukmu saat checkout selesai. Transfer ditunggu 24 jam.",
         };
   const Icon = config.icon;
   return (
@@ -65,14 +65,18 @@ function QuantityStepper({
   max,
   disabled,
   onChange,
+  compact = false,
 }: {
   value: number;
   max: number;
   disabled: boolean;
   onChange: (value: number) => void;
+  compact?: boolean;
 }) {
-  const btn =
-    "flex h-12 w-11 items-center justify-center text-ink-900 outline-none hover:bg-ink-100 focus-visible:bg-ink-100 disabled:text-ink-300 disabled:hover:bg-transparent";
+  const btn = cn(
+    "flex h-12 items-center justify-center text-ink-900 outline-none hover:bg-ink-100 focus-visible:bg-ink-100 disabled:text-ink-300 disabled:hover:bg-transparent",
+    compact ? "w-9" : "w-11"
+  );
   return (
     <div className="flex h-12 shrink-0 items-center overflow-hidden rounded-[10px] border border-ink-300 bg-white">
       <button
@@ -84,7 +88,13 @@ function QuantityStepper({
       >
         <MinusIcon className="size-4" />
       </button>
-      <span className="w-10 text-center text-[15px] font-semibold text-ink-900" aria-live="polite">
+      <span
+        className={cn(
+          "text-center text-[15px] font-semibold text-ink-900",
+          compact ? "w-7" : "w-10"
+        )}
+        aria-live="polite"
+      >
         {value}
       </span>
       <button
@@ -177,7 +187,7 @@ export function ProductBuyBox({ product }: { product: ProductDetail }) {
       ) : null}
 
       <div className="flex flex-col gap-3 pt-1">
-        <div className="flex gap-3">
+        <div className="hidden gap-3 lg:flex">
           <QuantityStepper
             value={qty}
             max={available}
@@ -235,12 +245,13 @@ export function ProductBuyBox({ product }: { product: ProductDetail }) {
       </ul>
 
       <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-ink-200 bg-background px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(28,25,23,0.08)] lg:hidden">
-        <div className="flex shrink-0 flex-col">
-          <span className="text-[11px] text-ink-500">Total</span>
-          <span className="font-heading text-lg leading-tight font-bold text-ink-900">
-            {formatRupiah(product.price * qty)}
-          </span>
-        </div>
+        <QuantityStepper
+          compact
+          value={qty}
+          max={available}
+          disabled={soldOut || busy}
+          onChange={setQuantity}
+        />
         <Button
           className="h-12 flex-1 text-[15px] font-semibold"
           disabled={soldOut || busy}

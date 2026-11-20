@@ -31,7 +31,7 @@ function ProductInfoTabs({ product }: { product: ProductDetail }) {
           Spesifikasi
         </TabsTrigger>
         <TabsTrigger value="pengiriman" className={trigger}>
-          Pengiriman dan pembayaran
+          Pengiriman
         </TabsTrigger>
       </TabsList>
       <TabsContent value="deskripsi" className="min-w-0">
