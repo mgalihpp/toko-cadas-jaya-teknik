@@ -16,7 +16,7 @@ export function HeroBanner({ images }: { images: string[] }) {
   }, [count]);
 
   return (
-    <div className="m-3 flex h-[132px] items-center gap-2 overflow-hidden rounded-[14px] bg-gradient-to-br from-brand-700 to-brand-500 px-4">
+    <div className="m-3 flex min-h-[132px] items-center gap-2 overflow-hidden rounded-[14px] bg-gradient-to-br from-brand-700 to-brand-500 px-4 py-4">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <p className="text-xl leading-[1.35] font-bold text-white">Alat teknik lengkap, harga jelas</p>
         <p className="text-[13px] leading-[1.35] text-brand-100">
