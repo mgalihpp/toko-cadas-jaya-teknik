@@ -28,6 +28,7 @@ const checkoutInput = z
     fulfillment: z.enum(["kirim", "ambil"]),
     address: z.string().trim().max(500).optional(),
     paymentMethod: z.enum(["tunai", "transfer"]),
+    cartItemIds: z.array(z.uuid()).min(1).optional(),
   })
   .refine((v) => v.fulfillment === "ambil" || (v.address && v.address.length >= 5), {
     path: ["address"],
@@ -62,10 +63,9 @@ export const ordersRouter = createTRPCRouter({
       await expireOverdueOrders();
 
       return ctx.db.transaction(async (tx) => {
-        const cart = await tx
-          .select()
-          .from(cartItems)
-          .where(eq(cartItems.userId, ctx.user.id));
+        const cart = (
+          await tx.select().from(cartItems).where(eq(cartItems.userId, ctx.user.id))
+        ).filter((c) => !input.cartItemIds || input.cartItemIds.includes(c.id));
         if (cart.length === 0) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Keranjang kosong" });
         }
@@ -134,7 +134,15 @@ export const ordersRouter = createTRPCRouter({
           .values(lines.map((l) => ({ ...l, orderId: order.id })));
         await lockStockForItems(tx, lines, order.id, ctx.user.id);
         await logStatus(tx, order.id, null, "menunggu_pembayaran", ctx.user.id, "Pesanan dibuat");
-        await tx.delete(cartItems).where(eq(cartItems.userId, ctx.user.id));
+        await tx.delete(cartItems).where(
+          and(
+            eq(cartItems.userId, ctx.user.id),
+            inArray(
+              cartItems.id,
+              cart.map((c) => c.id)
+            )
+          )
+        );
 
         return { code: order.code, total };
       });

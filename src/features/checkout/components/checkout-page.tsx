@@ -1,69 +1,19 @@
 "use client";
 
-import { Check, LogIn, RotateCw, ShieldAlert,ShoppingCart, WifiOff } from "lucide-react";
-import Link from "next/link";
+import { LogInIcon, ShieldAlertIcon, ShoppingCartIcon, WifiOffIcon } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Loader2Icon } from "lucide-react";
+import { MButton, MLink } from "@/components/mobile/m-button";
+import { TopBar } from "@/components/mobile/top-bar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
 import { StatusPanel, useCart, useIsCustomer } from "@/features/cart";
-import { cn } from "@/lib/utils";
 import { CheckoutForm } from "./checkout-form";
 
 export function CheckoutPage() {
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 pt-6 pb-20 sm:px-6 lg:px-20 lg:pt-8 lg:pb-28">
-      <CheckoutSteps />
+    <div className="flex flex-1 flex-col">
+      <TopBar title="Checkout" backHref="/keranjang" cart={false} />
       <CheckoutContent />
-    </div>
-  );
-}
-
-const steps = ["Keranjang", "Checkout", "Pembayaran"] as const;
-
-function CheckoutSteps() {
-  return (
-    <div className="mb-8 flex flex-wrap items-center justify-center gap-4 border-b border-border pb-5 lg:mb-12">
-      <ol className="flex items-center gap-2 sm:gap-3" aria-label="Langkah pemesanan">
-        {steps.map((label, i) => {
-          const done = i === 0;
-          const current = i === 1;
-          return (
-            <li key={label} className="flex items-center gap-2 sm:gap-3">
-              {i > 0 ? <span className="h-px w-5 bg-ink-300 sm:w-10" aria-hidden /> : null}
-              <span
-                className="flex items-center gap-2"
-                aria-current={current ? "step" : undefined}
-              >
-                <span
-                  className={cn(
-                    "flex size-6 items-center justify-center rounded-full text-xs font-bold",
-                    done && "bg-ink-900 text-white",
-                    current && "bg-brand-600 text-white",
-                    !done && !current && "border border-border text-ink-500"
-                  )}
-                >
-                  {done ? <Check className="size-3.5" /> : i + 1}
-                </span>
-                {done ? (
-                  <Link href="/keranjang" className="text-sm font-medium text-ink-900 hover:underline">
-                    {label}
-                  </Link>
-                ) : (
-                  <span
-                    className={cn(
-                      "text-sm",
-                      current ? "font-semibold text-ink-900" : "hidden font-medium text-ink-500 sm:inline"
-                    )}
-                  >
-                    {label}
-                  </span>
-                )}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
     </div>
   );
 }
@@ -75,76 +25,63 @@ function CheckoutContent() {
 
   if (placedCode) {
     return (
-      <div className="flex flex-col items-center gap-3 py-20 text-center text-ink-600" role="status">
-        <Spinner className="size-6 text-brand-600" />
-        <p className="text-sm">Pesanan {placedCode} dibuat. Membuka detail pesanan...</p>
+      <div className="flex flex-col items-center gap-3 py-20 text-center text-ink-500" role="status">
+        <Loader2Icon className="size-6 animate-spin text-brand-600" />
+        <p className="text-sm">Pesanan {placedCode} dibuat. Membuka halaman pembayaran…</p>
       </div>
     );
   }
-
   if (sessionPending || (isCustomer && cart.isPending)) return <CheckoutSkeleton />;
-
   if (!session) {
     return (
       <StatusPanel
-        icon={LogIn}
+        icon={LogInIcon}
         title="Masuk untuk checkout"
         description="Pesanan disimpan di akunmu agar statusnya bisa dipantau. Masuk atau daftar dulu."
       >
-        <Button asChild size="lg" className="h-11 px-5">
-          <Link href="/masuk?next=/checkout">Masuk</Link>
-        </Button>
+        <MLink href="/masuk?next=/checkout" className="h-[46px] px-6">
+          Masuk
+        </MLink>
       </StatusPanel>
     );
   }
-
   if (!isCustomer) {
     return (
       <StatusPanel
-        icon={ShieldAlert}
+        icon={ShieldAlertIcon}
         tone="error"
         title="Checkout khusus pelanggan"
         description="Akun admin tidak dapat membuat pesanan. Masuk dengan akun pelanggan."
       />
     );
   }
-
   if (cart.isError || !cart.data) {
     return (
       <StatusPanel
-        icon={WifiOff}
+        icon={WifiOffIcon}
         tone="error"
         title="Koneksi terputus"
         description="Data keranjang belum bisa dimuat. Periksa internet lalu coba lagi."
       >
-        <Button
-          size="lg"
-          variant="outline"
-          className="h-11 px-5"
-          onClick={() => cart.refetch()}
-          disabled={cart.isFetching}
-        >
-          <RotateCw className={cart.isFetching ? "animate-spin" : undefined} />
+        <MButton className="px-7" loading={cart.isFetching} onClick={() => cart.refetch()}>
           Coba lagi
-        </Button>
+        </MButton>
       </StatusPanel>
     );
   }
-
   if (cart.data.items.length === 0) {
     return (
       <StatusPanel
-        icon={ShoppingCart}
+        icon={ShoppingCartIcon}
         title="Keranjangmu masih kosong"
         description="Tambahkan barang ke keranjang dulu sebelum checkout."
       >
-        <Button asChild size="lg" className="h-11 px-5">
-          <Link href="/produk">Lihat Katalog</Link>
-        </Button>
+        <MLink href="/produk" className="h-[46px] px-6">
+          Lihat katalog
+        </MLink>
       </StatusPanel>
     );
   }
-
   return (
     <CheckoutForm
       cart={cart.data}
@@ -159,23 +96,11 @@ function CheckoutContent() {
 
 function CheckoutSkeleton() {
   return (
-    <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-14">
-      <div className="flex flex-col gap-8">
-        <Skeleton className="h-10 w-48" />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Skeleton className="h-16" />
-          <Skeleton className="h-16" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Skeleton className="h-20 rounded-xl" />
-          <Skeleton className="h-20 rounded-xl" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Skeleton className="h-20 rounded-xl" />
-          <Skeleton className="h-20 rounded-xl" />
-        </div>
-      </div>
-      <Skeleton className="h-96 rounded-2xl" />
+    <div role="status" className="flex flex-col gap-1.5">
+      <span className="sr-only">Memuat checkout</span>
+      {[96, 150, 130, 100].map((h, i) => (
+        <Skeleton key={i} className="w-full rounded-none" style={{ height: h }} />
+      ))}
     </div>
   );
 }

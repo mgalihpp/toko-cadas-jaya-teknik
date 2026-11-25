@@ -1,20 +1,13 @@
 "use client";
 
-import { ImageIcon, Minus, Plus, Trash2 } from "lucide-react";
+import { CheckIcon, ImageIcon, MinusIcon, PlusIcon, Trash2Icon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
-import { ConditionBadge } from "@/features/catalog";
-import { Button } from "@/components/ui/button";
+import { SwipeRow } from "@/components/mobile/swipe-row";
+import { ProductBadge } from "@/features/catalog";
 import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useCartMutations } from "../hooks/use-cart";
 import { maxQuantity, stockState, type CartItem } from "../lib";
-
-const stockTone = {
-  habis: "text-error",
-  kurang: "text-error",
-  terakhir: "text-warning",
-  tersedia: "text-success",
-} as const;
 
 export function ProductThumb({
   src,
@@ -28,8 +21,8 @@ export function ProductThumb({
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-ink-100 text-ink-500",
-        className
+        "flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-ink-100 text-ink-500",
+        className,
       )}
     >
       {src ? (
@@ -42,7 +35,45 @@ export function ProductThumb({
   );
 }
 
-export function CartItemRow({ item }: { item: CartItem }) {
+export function Checkbox({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={onChange}
+      className={cn(
+        "flex size-[22px] shrink-0 items-center justify-center rounded-md border-2",
+        checked ? "border-brand-600 bg-brand-600" : "border-ink-300 bg-white",
+      )}
+    >
+      {checked ? <CheckIcon className="size-4 text-white" strokeWidth={3} /> : null}
+    </button>
+  );
+}
+
+export function CartItemRow({
+  item,
+  selected,
+  onToggle,
+  fulfillmentLabel,
+  editing,
+}: {
+  item: CartItem;
+  selected: boolean;
+  onToggle: () => void;
+  fulfillmentLabel: string;
+  editing: boolean;
+}) {
   const { setQuantity, remove } = useCartMutations();
   const stock = stockState(item);
   const unavailable = stock.kind === "habis";
@@ -50,94 +81,101 @@ export function CartItemRow({ item }: { item: CartItem }) {
   const busy =
     (setQuantity.isPending && setQuantity.variables?.productId === item.productId) ||
     (remove.isPending && remove.variables?.productId === item.productId);
-
-  const change = (quantity: number) =>
-    setQuantity.mutate({ productId: item.productId, quantity });
+  const change = (quantity: number) => setQuantity.mutate({ productId: item.productId, quantity });
+  const doRemove = () => remove.mutate({ productId: item.productId });
+  const stepBtn = "flex size-[34px] items-center justify-center disabled:text-ink-500 text-brand-700";
 
   return (
-    <li
-      className={cn(
-        "grid grid-cols-[80px_1fr_auto] items-start gap-x-4 gap-y-3 border-b border-border py-5 sm:grid-cols-[112px_1fr_auto_auto_auto] sm:items-center sm:gap-5 sm:py-6",
-        busy && "opacity-60"
-      )}
-    >
-      <Link href={`/produk/${item.slug}`} className="row-span-2 sm:row-span-1">
-        <ProductThumb
-          src={item.image}
-          alt={item.name}
-          className={cn("size-20 sm:size-28", unavailable && "grayscale")}
-        />
-      </Link>
-
-      <div className="flex min-w-0 flex-col gap-2">
-        <ConditionBadge condition={item.condition} className="w-fit" />
-        <Link
-          href={`/produk/${item.slug}`}
-          className={cn(
-            "font-semibold leading-snug hover:underline",
-            unavailable ? "text-ink-500" : "text-ink-900"
-          )}
-        >
-          {item.name}
-        </Link>
-        <p className={cn("text-[13px] font-medium", stockTone[stock.kind])}>{stock.label}</p>
-      </div>
-
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-lg"
-        aria-label={`Hapus ${item.name} dari keranjang`}
-        disabled={busy}
-        onClick={() => remove.mutate({ productId: item.productId })}
-        className={cn(
-          "col-start-3 row-start-1 sm:col-start-5",
-          unavailable
-            ? "bg-error-soft text-error hover:bg-error-soft/80 hover:text-error"
-            : "text-ink-500"
-        )}
+    <li className={cn("border-b border-ink-200 bg-white last:border-b-0", busy && "opacity-60")}>
+      <SwipeRow
+        actionWidth={84}
+        actions={
+          <button
+            type="button"
+            onClick={doRemove}
+            aria-label={`Hapus ${item.name}`}
+            className="flex flex-1 flex-col items-center justify-center gap-1 bg-error text-xs font-bold text-white"
+          >
+            <Trash2Icon className="size-5" />
+            Hapus
+          </button>
+        }
       >
-        <Trash2 className="size-[18px]" />
-      </Button>
-
-      <div className="col-span-2 col-start-2 flex items-center justify-between gap-4 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:contents">
-        <div
-          className={cn(
-            "flex h-9 w-[108px] items-center rounded-lg border border-border",
-            unavailable && "pointer-events-none opacity-50"
-          )}
-        >
-          <button
-            type="button"
-            aria-label="Kurangi jumlah"
-            className="flex h-full w-9 items-center justify-center text-ink-700 disabled:text-ink-300"
-            disabled={busy || unavailable || item.quantity <= 1}
-            onClick={() => change(Math.min(item.quantity - 1, max))}
-          >
-            <Minus className="size-3.5" />
-          </button>
-          <span className="flex-1 text-center text-sm font-semibold text-ink-900" aria-live="polite">
-            {item.quantity}
-          </span>
-          <button
-            type="button"
-            aria-label="Tambah jumlah"
-            className="flex h-full w-9 items-center justify-center text-ink-700 disabled:text-ink-300"
-            disabled={busy || unavailable || item.quantity >= max}
-            onClick={() => change(item.quantity + 1)}
-          >
-            <Plus className="size-3.5" />
-          </button>
+        <div className="flex items-center gap-2.5 p-3">
+          <Checkbox checked={selected && !unavailable} onChange={onToggle} label={`Pilih ${item.name}`} />
+          <Link href={`/produk/${item.slug}`}>
+            <ProductThumb
+              src={item.image}
+              alt=""
+              className={cn("size-[76px]", unavailable && "grayscale")}
+            />
+          </Link>
+          <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
+            <Link
+              href={`/produk/${item.slug}`}
+              className={cn(
+                "line-clamp-2 text-sm leading-[1.35] font-medium",
+                unavailable ? "text-ink-500" : "text-ink-900",
+              )}
+            >
+              {item.name}
+            </Link>
+            <div className="flex items-center gap-1.5">
+              <ProductBadge kind={item.condition} />
+              <span className="text-xs text-ink-500">{fulfillmentLabel}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="flex-1 text-[15px] font-bold text-brand-700">{formatRupiah(item.price)}</p>
+              {editing ? (
+                <button
+                  type="button"
+                  onClick={doRemove}
+                  aria-label={`Hapus ${item.name}`}
+                  className="flex size-9 items-center justify-center rounded-lg border-[1.5px] border-error-border text-error"
+                >
+                  <Trash2Icon className="size-[18px]" />
+                </button>
+              ) : null}
+              <div className="flex h-9 items-center overflow-hidden rounded-lg border-[1.5px] border-ink-200">
+                <button
+                  type="button"
+                  aria-label="Kurangi jumlah"
+                  className={stepBtn}
+                  disabled={busy || unavailable || item.quantity <= 1}
+                  onClick={() => change(item.quantity - 1)}
+                >
+                  <MinusIcon className="size-[18px]" strokeWidth={2} />
+                </button>
+                <span className="w-8 text-center text-[15px] font-bold text-ink-900" aria-live="polite">
+                  {item.quantity}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Tambah jumlah"
+                  className={stepBtn}
+                  disabled={busy || unavailable || item.quantity >= max}
+                  onClick={() => change(item.quantity + 1)}
+                >
+                  <PlusIcon className="size-[18px]" strokeWidth={2} />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-        <p
-          className={cn(
-            "text-right text-base font-bold sm:min-w-32 sm:text-lg",
-            unavailable ? "text-ink-500" : "text-ink-900"
-          )}
-        >
-          {formatRupiah(item.price * item.quantity)}
-        </p>
-      </div>
+      </SwipeRow>
+      {unavailable || stock.kind === "kurang" ? (
+        <div className="mx-3 mb-3 flex gap-2.5 rounded-[10px] border border-error-border bg-error-soft px-2.5 py-2">
+          <TriangleAlertIcon className="size-5 shrink-0 text-error" strokeWidth={2} />
+          <p className="text-[13px] text-ink-900">{stock.label}</p>
+        </div>
+      ) : item.condition === "bekas" && item.available <= 1 ? (
+        <div className="mx-3 mb-3 flex gap-2.5 rounded-[10px] border border-warning-border bg-warning-soft px-2.5 py-2">
+          <TriangleAlertIcon className="size-5 shrink-0 text-warning" strokeWidth={2} />
+          <p className="text-[13px] text-ink-900">
+            Barang bekas, stok hanya 1 unit. Jumlah tidak bisa ditambah.
+          </p>
+        </div>
+      ) : null}
     </li>
   );
 }

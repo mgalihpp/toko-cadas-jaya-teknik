@@ -1,223 +1,202 @@
 "use client";
 
 import {
-  CircleAlert,
-  Info,
-  Lock,
-  LogIn,
-  RotateCw,
-  ShieldAlert,
-  ShoppingCart,
-  WifiOff,
+  ChevronRightIcon,
+  ClockIcon,
+  LogInIcon,
+  ShieldAlertIcon,
+  ShoppingCartIcon,
+  StoreIcon,
+  TagIcon,
+  WifiOffIcon,
 } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { MButton, MLink } from "@/components/mobile/m-button";
+import { StickyBar } from "@/components/mobile/sticky-bar";
+import { TopBar } from "@/components/mobile/top-bar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getPreferredFulfillment } from "@/features/checkout/preference";
 import { formatRupiah } from "@/lib/format";
 import { useCart, useIsCustomer } from "../hooks/use-cart";
-import { summarize } from "../lib";
-import { CartItemRow } from "./cart-item-row";
+import { useCartSelection } from "../selection";
+import { CartItemRow, Checkbox } from "./cart-item-row";
 import { StatusPanel } from "./status-panel";
 
 export function CartPage() {
-  return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 pt-8 pb-20 sm:px-6 lg:px-20 lg:pt-12 lg:pb-28">
-      <CartContent />
-    </div>
-  );
-}
-
-function CartHeading({ count }: { count?: number }) {
-  return (
-    <div className="mb-6 flex items-baseline gap-3.5 lg:mb-8">
-      <h1 className="font-heading text-3xl font-bold text-ink-900 lg:text-[44px]">Keranjang</h1>
-      {count !== undefined ? <span className="text-ink-500">{count} produk</span> : null}
-    </div>
-  );
-}
-
-function CartContent() {
   const { session, isPending: sessionPending, isCustomer } = useIsCustomer();
   const cart = useCart();
+  const [editing, setEditing] = useState(false);
+  const items = cart.data?.items ?? [];
+  const selection = useCartSelection(items.map((i) => i.id));
 
-  if (sessionPending || (isCustomer && cart.isPending)) {
-    return (
-      <>
-        <CartHeading />
+  const loading = sessionPending || (isCustomer && cart.isPending);
+  const ready = !loading && session && isCustomer && cart.data && items.length > 0;
+
+  const title = ready ? `Keranjang (${items.length})` : "Keranjang";
+  const edit =
+    ready ? (
+      <button
+        type="button"
+        onClick={() => setEditing((e) => !e)}
+        className="px-3 text-sm font-bold text-brand-600"
+      >
+        {editing ? "Selesai" : "Ubah"}
+      </button>
+    ) : null;
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <TopBar title={title} backHref="/" cart={false} right={edit} />
+      {loading ? (
         <CartSkeleton />
-      </>
-    );
-  }
-
-  if (!session) {
-    return (
-      <>
-        <CartHeading />
+      ) : !session ? (
         <StatusPanel
-          icon={LogIn}
+          icon={LogInIcon}
           title="Masuk untuk melihat keranjang"
           description="Keranjangmu tersimpan di akun. Masuk atau daftar dulu untuk menambah dan memesan barang."
         >
-          <Button asChild size="lg" className="h-11 px-5">
-            <Link href="/masuk?next=/keranjang">Masuk</Link>
-          </Button>
-          <Button asChild size="lg" variant="outline" className="h-11 px-5">
-            <Link href="/daftar?next=/keranjang">Daftar</Link>
-          </Button>
+          <MLink href="/masuk?next=/keranjang" className="h-[46px] px-6">
+            Masuk
+          </MLink>
+          <MLink href="/daftar?next=/keranjang" variant="secondary" className="h-[46px] px-6">
+            Daftar
+          </MLink>
         </StatusPanel>
-      </>
-    );
-  }
-
-  if (!isCustomer) {
-    return (
-      <>
-        <CartHeading />
+      ) : !isCustomer ? (
         <StatusPanel
-          icon={ShieldAlert}
+          icon={ShieldAlertIcon}
           tone="error"
           title="Keranjang khusus pelanggan"
           description="Akun admin tidak dapat berbelanja. Masuk dengan akun pelanggan untuk memakai keranjang."
         >
-          <Button asChild size="lg" variant="outline" className="h-11 px-5">
-            <Link href="/admin">Ke Panel Admin</Link>
-          </Button>
+          <MLink href="/admin" variant="secondary" className="h-[46px] px-6">
+            Ke Panel Admin
+          </MLink>
         </StatusPanel>
-      </>
-    );
-  }
-
-  if (cart.isError || !cart.data) {
-    return (
-      <>
-        <CartHeading />
+      ) : cart.isError || !cart.data ? (
         <StatusPanel
-          icon={WifiOff}
+          icon={WifiOffIcon}
           tone="error"
           title="Koneksi terputus"
           description="Keranjang belum bisa dimuat. Periksa internet lalu coba lagi."
         >
-          <Button
-            size="lg"
-            variant="outline"
-            className="h-11 px-5"
-            onClick={() => cart.refetch()}
-            disabled={cart.isFetching}
-          >
-            <RotateCw className={cart.isFetching ? "animate-spin" : undefined} />
+          <MButton className="px-7" loading={cart.isFetching} onClick={() => cart.refetch()}>
             Coba lagi
-          </Button>
+          </MButton>
         </StatusPanel>
-      </>
-    );
-  }
-
-  const { items, canCheckout } = cart.data;
-
-  if (items.length === 0) {
-    return (
-      <>
-        <CartHeading count={0} />
+      ) : items.length === 0 ? (
         <StatusPanel
-          icon={ShoppingCart}
+          icon={ShoppingCartIcon}
           title="Keranjangmu masih kosong"
           description="Mulai dari kategori favorit atau lihat barang bekas pilihan."
         >
-          <Button asChild size="lg" className="h-11 px-5">
-            <Link href="/produk">Lihat Katalog</Link>
-          </Button>
+          <MLink href="/produk" className="h-[46px] px-6">
+            Lihat katalog
+          </MLink>
         </StatusPanel>
-      </>
-    );
-  }
+      ) : (
+        <CartBody editing={editing} selection={selection} items={items} />
+      )}
+    </div>
+  );
+}
 
-  const summary = summarize(items);
+function CartBody({
+  items,
+  selection,
+  editing,
+}: {
+  items: NonNullable<ReturnType<typeof useCart>["data"]>["items"];
+  selection: ReturnType<typeof useCartSelection>;
+  editing: boolean;
+}) {
+  const router = useRouter();
+  const chosen = items.filter((i) => selection.isSelected(i.id) && i.purchasable);
+  const total = chosen.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const fulfillment = getPreferredFulfillment() === "kirim" ? "Dikirim" : "Ambil di toko";
 
   return (
     <>
-      <CartHeading count={items.length} />
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-12">
-        <section aria-label="Daftar produk">
-          {summary.unavailableCount > 0 ? (
-            <div
-              role="alert"
-              className="mb-2.5 flex items-start gap-3 rounded-xl border border-error-border bg-error-soft px-4 py-3.5 text-sm font-medium text-error"
-            >
-              <CircleAlert className="mt-px size-5 shrink-0" />
-              <p>
-                {summary.unavailableCount} produk stoknya habis atau berubah. Hapus atau
-                sesuaikan jumlahnya agar bisa lanjut checkout.
-              </p>
-            </div>
-          ) : null}
-          <ul>
-            {items.map((item) => (
-              <CartItemRow key={item.id} item={item} />
-            ))}
-          </ul>
-        </section>
-
-        <aside className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-6 lg:sticky lg:top-24 lg:p-7">
-          <h2 className="font-heading text-xl font-semibold text-ink-900">Ringkasan</h2>
-          <dl className="flex flex-col gap-3 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt className="text-ink-600">Subtotal ({summary.quantity} barang)</dt>
-              <dd className="font-medium text-ink-900">{formatRupiah(summary.subtotal)}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-ink-600">Ongkos kirim</dt>
-              <dd className="text-right font-medium text-ink-900">Dihitung saat checkout</dd>
-            </div>
-          </dl>
-          <div className="flex items-center justify-between border-t border-border pt-4">
-            <span className="text-[15px] font-semibold text-ink-900">Total</span>
-            <span className="font-heading text-2xl font-bold text-ink-900 lg:text-[26px]">
-              {formatRupiah(summary.subtotal)}
-            </span>
+      <div className="flex flex-1 flex-col pb-[76px]">
+        <div className="bg-white px-3 py-2">
+          <div className="flex items-center gap-2.5 rounded-[10px] border border-info-border bg-info-soft px-2.5 py-2">
+            <ClockIcon className="size-5 shrink-0 text-brand-700" strokeWidth={2} />
+            <p className="text-[13px] text-ink-900">Stok baru dikunci setelah kamu menyelesaikan checkout.</p>
           </div>
-          {canCheckout ? (
-            <Button asChild size="lg" className="h-12 text-[15px]">
-              <Link href="/checkout">
-                <Lock />
-                Lanjut ke Checkout
-              </Link>
-            </Button>
-          ) : (
-            <>
-              <Button size="lg" className="h-12 text-[15px]" disabled>
-                <Lock />
-                Lanjut ke Checkout
-              </Button>
-              <p className="flex items-start gap-2 text-[13px] text-ink-500">
-                <Info className="mt-px size-4 shrink-0" />
-                Tombol aktif setelah produk habis dihapus atau jumlahnya disesuaikan
-              </p>
-            </>
-          )}
-        </aside>
+        </div>
+        <div className="h-2" />
+        <div className="flex items-center gap-2 border-b border-ink-200 bg-white p-3">
+          <Checkbox
+            checked={selection.allSelected}
+            onChange={() => selection.setAll(!selection.allSelected)}
+            label="Pilih semua"
+          />
+          <StoreIcon className="size-5 text-brand-600" strokeWidth={1.8} />
+          <p className="flex-1 text-[15px] font-bold text-ink-900">Cadas Jaya Teknik</p>
+          <ChevronRightIcon className="size-[18px] text-ink-500" />
+        </div>
+        <ul className="bg-white">
+          {items.map((item) => (
+            <CartItemRow
+              key={item.id}
+              item={item}
+              selected={selection.isSelected(item.id)}
+              onToggle={() => selection.toggle(item.id)}
+              fulfillmentLabel={fulfillment}
+              editing={editing}
+            />
+          ))}
+        </ul>
+        <div className="h-2" />
+        <div className="flex items-center gap-2 bg-white p-3">
+          <TagIcon className="size-5 text-brand-600" strokeWidth={1.8} />
+          <p className="flex-1 text-sm font-medium text-ink-500">Belum ada voucher</p>
+          <ChevronRightIcon className="size-[18px] text-ink-500" />
+        </div>
       </div>
+
+      <StickyBar>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            checked={selection.allSelected}
+            onChange={() => selection.setAll(!selection.allSelected)}
+            label="Pilih semua"
+          />
+          <span className="text-sm font-medium text-ink-900">Semua</span>
+        </div>
+        <div className="flex flex-1 flex-col text-right">
+          <span className="text-xs text-ink-500">Total</span>
+          <span className="text-lg leading-[1.2] font-bold text-brand-700">{formatRupiah(total)}</span>
+        </div>
+        <MButton
+          size="lg"
+          className="w-[150px]"
+          disabled={chosen.length === 0}
+          onClick={() => router.push("/checkout")}
+        >
+          Checkout ({chosen.length})
+        </MButton>
+      </StickyBar>
     </>
   );
 }
 
 function CartSkeleton() {
   return (
-    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-12">
-      <div>
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="flex items-center gap-5 border-b border-border py-6">
-            <Skeleton className="size-20 rounded-xl sm:size-28" />
-            <div className="flex flex-1 flex-col gap-2">
-              <Skeleton className="h-4 w-12" />
-              <Skeleton className="h-4 w-2/3" />
-              <Skeleton className="h-3 w-20" />
-            </div>
-            <Skeleton className="hidden h-9 w-[108px] sm:block" />
-            <Skeleton className="hidden h-5 w-28 sm:block" />
+    <div role="status" className="flex flex-col bg-white">
+      <span className="sr-only">Memuat keranjang</span>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="flex items-center gap-2.5 border-b border-ink-200 p-3">
+          <Skeleton className="size-[22px] rounded-md" />
+          <Skeleton className="size-[76px] rounded-lg" />
+          <div className="flex flex-1 flex-col gap-2">
+            <Skeleton className="h-3.5 w-3/4" />
+            <Skeleton className="h-3 w-1/3" />
+            <Skeleton className="h-4 w-1/2" />
           </div>
-        ))}
-      </div>
-      <Skeleton className="h-72 rounded-2xl" />
+        </div>
+      ))}
     </div>
   );
 }
