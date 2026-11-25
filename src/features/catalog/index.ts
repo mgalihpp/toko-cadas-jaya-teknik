@@ -1,4 +1,9 @@
-export { ProductCard, type ProductCardData } from "./components/product-card";
+export {
+  FavoriteButton,
+  ProductBadge,
+  ProductCard,
+  type ProductCardData,
+} from "./components/product-card";
 export { ConditionBadge } from "./components/condition-badge";
 export {
   StockIndicator,

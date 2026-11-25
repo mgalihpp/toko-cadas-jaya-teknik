@@ -5,10 +5,13 @@ import {
   count,
   desc,
   eq,
+  gt,
   gte,
   ilike,
   inArray,
   lte,
+  max,
+  min,
   or,
 } from "drizzle-orm";
 import { z } from "zod";
@@ -38,6 +41,7 @@ export const listInput = z.object({
   condition: z.enum(CONDITIONS).optional(),
   minPrice: z.number().int().min(0).optional(),
   maxPrice: z.number().int().min(0).optional(),
+  inStock: z.boolean().optional(),
   sort: z.enum(["terbaru", "termurah", "termahal"]).default("terbaru"),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(48).default(12),
@@ -75,6 +79,14 @@ export const catalogRouter = createTRPCRouter({
     return rows.map((row) => ({ ...row, image: imageByCategory.get(row.id) ?? null }));
   }),
 
+  priceRange: publicProcedure.query(async ({ ctx }) => {
+    const [row] = await ctx.db
+      .select({ min: min(products.price), max: max(products.price) })
+      .from(products)
+      .where(eq(products.isActive, true));
+    return { min: row?.min ?? 0, max: row?.max ?? 0 };
+  }),
+
   products: publicProcedure.input(listInput).query(async ({ ctx, input }) => {
     const where = and(
       eq(products.isActive, true),
@@ -87,7 +99,8 @@ export const catalogRouter = createTRPCRouter({
       input.categorySlug ? eq(categories.slug, input.categorySlug) : undefined,
       input.condition ? eq(products.condition, input.condition) : undefined,
       input.minPrice !== undefined ? gte(products.price, input.minPrice) : undefined,
-      input.maxPrice !== undefined ? lte(products.price, input.maxPrice) : undefined
+      input.maxPrice !== undefined ? lte(products.price, input.maxPrice) : undefined,
+      input.inStock ? gt(available, 0) : undefined
     );
     const order =
       input.sort === "termurah"

@@ -5,7 +5,7 @@ const rupiah = new Intl.NumberFormat("id-ID", {
 });
 
 export function formatRupiah(value: number | string): string {
-  return rupiah.format(Number(value));
+  return rupiah.format(Number(value)).replace(/\s/g, "");
 }
 
 export function formatDate(value: Date | string | number): string {

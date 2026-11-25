@@ -1,6 +1,7 @@
 "use client";
 
 import { Dialog } from "radix-ui";
+import { useRef } from "react";
 import { cn } from "@/lib/utils";
 
 export const SheetRoot = Dialog.Root;
@@ -21,6 +22,8 @@ export function BottomSheet({
   title,
   ...props
 }: Omit<React.ComponentProps<typeof Dialog.Content>, "title"> & { title: string }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const startY = useRef<number | null>(null);
   return (
     <Dialog.Portal>
       <Overlay />
@@ -33,7 +36,21 @@ export function BottomSheet({
         {...props}
       >
         <Dialog.Title className="sr-only">{title}</Dialog.Title>
-        <span className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-ink-300" aria-hidden />
+        <Dialog.Close ref={closeRef} className="hidden" tabIndex={-1} aria-hidden />
+        <div
+          className="flex h-5 shrink-0 touch-none items-start justify-center pt-2"
+          onTouchStart={(e) => {
+            startY.current = e.touches[0].clientY;
+          }}
+          onTouchEnd={(e) => {
+            if (startY.current !== null && e.changedTouches[0].clientY - startY.current > 60) {
+              closeRef.current?.click();
+            }
+            startY.current = null;
+          }}
+        >
+          <span className="h-1 w-10 rounded-full bg-ink-300" aria-hidden />
+        </div>
         {children}
       </Dialog.Content>
     </Dialog.Portal>
