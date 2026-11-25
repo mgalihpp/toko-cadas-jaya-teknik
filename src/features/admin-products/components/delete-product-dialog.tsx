@@ -1,23 +1,13 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { EyeOffIcon, Trash2Icon } from "lucide-react";
-import { AlertDialog as AlertDialogPrimitive } from "radix-ui";
+import { EyeOffIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogDescription,
-  AlertDialogOverlay,
-  AlertDialogPortal,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { MButton } from "@/components/mobile/m-button";
+import { BottomSheet, SheetClose, SheetRoot } from "@/components/mobile/sheet";
 import { useTRPC } from "@/trpc/client";
 import { useInvalidateProducts, useSetProductActive } from "../hooks/use-product-mutations";
-import { dangerButton, outlineButton, primaryButton } from "../styles";
 
 type Props = {
   product: { id: string; name: string; isActive: boolean } | null;
@@ -30,7 +20,6 @@ export function DeleteProductDialog({ product, onOpenChange, onDeleted }: Props)
   const invalidate = useInvalidateProducts();
   const [conflict, setConflict] = useState<string | null>(null);
   const setActive = useSetProductActive();
-
   const remove = useMutation(
     trpc.admin.products.delete.mutationOptions({
       onSuccess: async () => {
@@ -43,7 +32,7 @@ export function DeleteProductDialog({ product, onOpenChange, onDeleted }: Props)
         if (error.data?.code === "CONFLICT") setConflict(error.message);
         else toast.error(error.message);
       },
-    })
+    }),
   );
 
   function close() {
@@ -53,61 +42,67 @@ export function DeleteProductDialog({ product, onOpenChange, onDeleted }: Props)
   }
 
   const busy = remove.isPending || setActive.isPending;
-  const Icon = conflict ? EyeOffIcon : Trash2Icon;
 
   return (
-    <AlertDialog open={product !== null} onOpenChange={(open) => !open && close()}>
-      <AlertDialogPortal>
-        <AlertDialogOverlay className="bg-ink-900/35 supports-backdrop-filter:backdrop-blur-none" />
-        <AlertDialogPrimitive.Content className="fixed top-1/2 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-[420px] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl bg-white p-6 shadow-[0_16px_40px_#1C191733] outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-          <div className="flex gap-3.5">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-error-soft text-error">
-              <Icon className="size-5" />
-            </span>
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <AlertDialogTitle className="font-heading text-lg/[23px] font-semibold text-ink-900">
-                {conflict ? "Produk tidak bisa dihapus" : "Hapus produk ini?"}
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-sm/[21px] text-ink-600">
-                {conflict ? (
-                  conflict
-                ) : (
-                  <>
-                    <span className="font-semibold text-ink-900">{product?.name}</span> akan dihapus permanen
-                    beserta fotonya. Tindakan ini tidak bisa dibatalkan.
-                  </>
-                )}
-              </AlertDialogDescription>
+    <SheetRoot open={product !== null} onOpenChange={(open) => !open && close()}>
+      <BottomSheet title="Hapus produk">
+        <div className="flex h-12 items-center gap-1 pr-2 pl-4">
+          <p className="flex-1 text-[17px] font-bold text-ink-900">Hapus produk?</p>
+          <SheetClose aria-label="Tutup" className="flex size-10 items-center justify-center rounded-full text-ink-500">
+            <XIcon className="size-6" strokeWidth={1.8} />
+          </SheetClose>
+        </div>
+        <div className="flex flex-col gap-3 px-4 py-1">
+          <div
+            className={
+              conflict
+                ? "flex gap-2.5 rounded-[10px] border border-warning-border bg-warning-soft p-3"
+                : "flex gap-2.5 rounded-[10px] border border-error-border bg-error-soft p-3"
+            }
+          >
+            <TriangleAlertIcon className={conflict ? "size-5 shrink-0 text-warning" : "size-5 shrink-0 text-error"} strokeWidth={2} />
+            <div className="flex flex-col gap-0.5">
+              <p className={conflict ? "text-sm font-bold text-warning" : "text-sm font-bold text-error"}>
+                {conflict ? "Tidak bisa dihapus" : "Hapus permanen"}
+              </p>
+              <p className="text-[13px] text-ink-900">
+                {conflict
+                  ? "Produk ini sudah pernah dipesan, jadi tidak bisa dihapus permanen agar riwayat dan laporan tetap utuh. Kamu bisa menonaktifkannya."
+                  : `${product?.name ?? "Produk"} akan dihapus permanen beserta fotonya. Tindakan ini tidak bisa dibatalkan.`}
+              </p>
             </div>
           </div>
-          <div className="flex flex-col-reverse gap-2.5 pt-2 sm:flex-row sm:justify-end">
-            <AlertDialogCancel disabled={busy} className={outlineButton}>
-              Batal
-            </AlertDialogCancel>
-            {conflict ? (
-              product?.isActive ? (
-                <Button
-                  className={primaryButton}
-                  disabled={busy}
-                  onClick={() => setActive.mutate({ id: product.id, isActive: false }, { onSuccess: close })}
-                >
-                  {setActive.isPending ? <Spinner /> : null}
-                  Nonaktifkan
-                </Button>
-              ) : null
-            ) : (
-              <Button
-                className={dangerButton}
-                disabled={busy}
-                onClick={() => product && remove.mutate({ id: product.id })}
+        </div>
+        <div className="flex gap-2.5 border-t border-ink-200 px-4 pt-2.5 pb-[18px]">
+          <MButton variant="outline" size="lg" className="w-[110px]" disabled={busy} onClick={close}>
+            Batal
+          </MButton>
+          {conflict ? (
+            product?.isActive ? (
+              <MButton
+                size="lg"
+                block
+                className="bg-brand-700"
+                loading={setActive.isPending}
+                onClick={() => setActive.mutate({ id: product.id, isActive: false }, { onSuccess: close })}
               >
-                {remove.isPending ? <Spinner /> : null}
-                Hapus
-              </Button>
-            )}
-          </div>
-        </AlertDialogPrimitive.Content>
-      </AlertDialogPortal>
-    </AlertDialog>
+                <EyeOffIcon className="size-[18px]" />
+                Nonaktifkan produk
+              </MButton>
+            ) : null
+          ) : (
+            <MButton
+              variant="danger"
+              size="lg"
+              block
+              loading={remove.isPending}
+              onClick={() => product && remove.mutate({ id: product.id })}
+            >
+              Hapus produk
+            </MButton>
+          )}
+        </div>
+      </BottomSheet>
+    </SheetRoot>
   );
 }
