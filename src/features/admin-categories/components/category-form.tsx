@@ -1,20 +1,17 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftIcon, CheckIcon, FolderIcon, LinkIcon } from "lucide-react";
-import Link from "next/link";
+import { CheckIcon, FolderIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { AdminHeader } from "@/components/layout";
+import { MButton, MLink } from "@/components/mobile/m-button";
+import { StickyBar } from "@/components/mobile/sticky-bar";
 import { EmptyState, ErrorState } from "@/components/shared";
-import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
 import { CATEGORY_ICONS } from "@/lib/category-icons";
 import type { CategoryIconKey } from "@/lib/category-icon-keys";
-import { slugify } from "@/lib/slug";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { categoryNameSchema } from "../schemas";
@@ -33,29 +30,37 @@ export function CategoryEditForm({ id }: { id: string }) {
   const categories = useQuery(trpc.admin.categories.list.queryOptions());
 
   if (categories.isError) {
-    return <ErrorState description={categories.error.message} onRetry={() => categories.refetch()} />;
+    return (
+      <div className="flex flex-1 flex-col">
+        <AdminHeader title="Ubah kategori" backHref="/admin/kategori" />
+        <ErrorState description={categories.error.message} onRetry={() => categories.refetch()} />
+      </div>
+    );
   }
   if (!categories.data) {
     return (
-      <div className="flex flex-col gap-6">
-        <Skeleton className="h-9 w-64" />
-        <Skeleton className="h-64 w-full max-w-[560px]" />
+      <div className="flex flex-1 flex-col">
+        <AdminHeader title="Ubah kategori" backHref="/admin/kategori" />
+        <Skeleton className="h-64 w-full rounded-none" />
       </div>
     );
   }
   const category = categories.data.find((c) => c.id === id);
   if (!category) {
     return (
-      <EmptyState
-        icon={FolderIcon}
-        title="Kategori tidak ditemukan"
-        description="Kategori ini mungkin sudah dihapus."
-        action={
-          <Button asChild variant="outline">
-            <Link href="/admin/kategori">Kembali ke kategori</Link>
-          </Button>
-        }
-      />
+      <div className="flex flex-1 flex-col">
+        <AdminHeader title="Ubah kategori" backHref="/admin/kategori" />
+        <EmptyState
+          icon={FolderIcon}
+          title="Kategori tidak ditemukan"
+          description="Kategori ini mungkin sudah dihapus."
+          action={
+            <MLink href="/admin/kategori" variant="secondary" className="h-[46px] px-6">
+              Kembali ke kategori
+            </MLink>
+          }
+        />
+      </div>
     );
   }
   return <CategoryForm key={category.id} target={{ mode: "edit", ...category }} />;
@@ -100,144 +105,76 @@ function CategoryForm({ target }: { target: Target }) {
     else create.mutate({ name: parsed.data, icon });
   }
 
-  const slug = slugify(name);
+  const title = target.mode === "edit" ? "Ubah kategori" : "Tambah kategori";
   const nameId = `${fieldId}-name`;
-  const slugId = `${fieldId}-slug`;
-  const title = target.mode === "edit" ? "Ubah Kategori" : "Tambah Kategori";
-
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3.5">
-          <Button
-            asChild
-            variant="outline"
-            className="size-9 shrink-0 rounded-[8px] border-ink-200 p-0 text-ink-700"
-          >
-            <Link href="/admin/kategori" aria-label="Kembali ke daftar kategori">
-              <ArrowLeftIcon />
-            </Link>
-          </Button>
-          <h1 className="font-heading text-[26px] leading-[33px] font-bold tracking-[-0.6px] text-ink-900">
-            {title}
-          </h1>
-        </div>
-        <div className="flex gap-2.5">
-          <Button
-            asChild
-            variant="outline"
-            className="h-[37px] flex-1 rounded-[8px] border-ink-300 bg-white px-4 font-semibold text-ink-900 sm:flex-none"
-          >
-            <Link href="/admin/kategori">Batal</Link>
-          </Button>
-          <Button
-            type="submit"
-            disabled={pending}
-            className="h-[37px] rounded-[8px] flex-1 gap-2 px-4 font-semibold sm:flex-none"
-          >
-            {pending ? <Spinner /> : <CheckIcon />}
-            Simpan
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-12 pt-2 lg:flex-row">
-        <div className="flex w-full flex-col gap-[22px] lg:w-[560px] lg:shrink-0">
-          <Field data-invalid={Boolean(error)} className="gap-1.5">
-            <FieldLabel htmlFor={nameId} className="text-[13px] leading-4 font-semibold text-ink-900">
-              Nama kategori
-            </FieldLabel>
-            <Input
-              id={nameId}
-              className="h-[42px] rounded-[8px] border-ink-300 bg-white px-3 text-sm text-ink-900 focus-visible:border-brand-600 focus-visible:ring-1 focus-visible:ring-brand-600 md:text-sm"
-              placeholder="Contoh: Gergaji Mesin"
-              value={name}
-              autoFocus
-              onChange={(e) => {
-                setName(e.target.value);
-                setError(undefined);
-              }}
-              aria-invalid={Boolean(error)}
-            />
-            {error ? (
-              <FieldError className="text-xs">{error}</FieldError>
-            ) : (
-              <FieldDescription className="text-xs leading-[15px] text-ink-500">
-                Tampil di menu dan filter katalog
-              </FieldDescription>
+    <form onSubmit={onSubmit} className="flex flex-1 flex-col pb-[76px]" noValidate>
+      <AdminHeader title={title} backHref="/admin/kategori" />
+      <section className="flex flex-col gap-3 bg-white p-3">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor={nameId} className="text-[13px] font-medium text-ink-900">
+            Nama kategori
+          </label>
+          <input
+            id={nameId}
+            autoFocus
+            value={name}
+            placeholder="Contoh: Gergaji Mesin"
+            onChange={(e) => {
+              setName(e.target.value);
+              setError(undefined);
+            }}
+            aria-invalid={Boolean(error)}
+            className={cn(
+              "h-12 w-full rounded-[10px] bg-white px-3 text-[15px] text-ink-900 outline-none placeholder:text-ink-500",
+              error ? "border-2 border-error" : "border-[1.5px] border-ink-200 focus:border-2 focus:border-brand-600",
             )}
-          </Field>
-
-          <div className="flex flex-col gap-1.5">
-            <span id={`${fieldId}-icon`} className="text-[13px] leading-4 font-semibold text-ink-900">
-              Ikon
-            </span>
-            <div
-              role="radiogroup"
-              aria-labelledby={`${fieldId}-icon`}
-              className="grid grid-cols-4 gap-2 sm:grid-cols-8"
-            >
-              {(Object.entries(CATEGORY_ICONS) as [CategoryIconKey, (typeof CATEGORY_ICONS)[CategoryIconKey]][]).map(
-                ([key, { label, Icon }]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="radio"
-                    aria-checked={icon === key}
-                    aria-label={label}
-                    title={label}
-                    onClick={() => setIcon(icon === key ? null : key)}
-                    className={cn(
-                      "flex h-11 cursor-pointer items-center justify-center rounded-[8px] border outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                      icon === key
-                        ? "border-brand-600 bg-brand-50 text-brand-700"
-                        : "border-ink-300 bg-white text-ink-700 hover:bg-ink-50"
-                    )}
-                  >
-                    <Icon className="size-5" />
-                  </button>
-                )
-              )}
-            </div>
-            <FieldDescription className="text-xs leading-[15px] text-ink-500">
-              Klik lagi untuk memakai ikon otomatis dari nama
-            </FieldDescription>
-          </div>
-
-          <Field className="gap-1.5">
-            <FieldLabel htmlFor={slugId} className="text-[13px] leading-4 font-semibold text-ink-900">
-              Slug URL
-            </FieldLabel>
-            <div className="flex h-[42px] items-center gap-2 rounded-[8px] border border-ink-300 bg-ink-50 px-3">
-              <LinkIcon className="size-4 shrink-0 text-ink-500" />
-              <input
-                id={slugId}
-                readOnly
-                tabIndex={-1}
-                value={slug}
-                placeholder="dibuat-dari-nama"
-                className="min-w-0 flex-1 bg-transparent font-mono text-sm text-ink-600 outline-none placeholder:text-ink-500"
-              />
-            </div>
-            <FieldDescription className="text-xs leading-[15px] text-ink-500">Dibuat otomatis dari nama</FieldDescription>
-          </Field>
+          />
+          {error ? (
+            <p className="text-xs font-medium text-error">{error}</p>
+          ) : (
+            <p className="text-xs font-medium text-ink-500">Tampil di menu dan filter katalog</p>
+          )}
         </div>
-
-        <div className="flex flex-1 flex-col gap-3">
-          <span className="text-[13px] leading-4 font-semibold text-ink-500">Pratinjau di katalog</span>
-          <div className="flex w-[200px] flex-col gap-3.5 rounded-[12px] border border-ink-200 bg-white px-[19px] py-[27px]">
-            <CategoryIcon slug={slug} icon={icon} className="size-7 text-ink-900" />
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <span className="truncate text-[15px] leading-[18px] font-semibold text-ink-900">
-                {name.trim() || "Nama kategori"}
-              </span>
-              <span className="text-xs leading-[15px] text-ink-500">
-                {target.mode === "edit" ? target.productCount : 0} produk
-              </span>
-            </div>
+        <div className="flex flex-col gap-1.5">
+          <span id={`${fieldId}-icon`} className="text-[13px] font-medium text-ink-900">
+            Ikon
+          </span>
+          <div role="radiogroup" aria-labelledby={`${fieldId}-icon`} className="grid grid-cols-4 gap-2">
+            {(Object.entries(CATEGORY_ICONS) as [CategoryIconKey, (typeof CATEGORY_ICONS)[CategoryIconKey]][]).map(
+              ([key, { label, Icon }]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="radio"
+                  aria-checked={icon === key}
+                  aria-label={label}
+                  title={label}
+                  onClick={() => setIcon(icon === key ? null : key)}
+                  className={cn(
+                    "flex h-[52px] items-center justify-center rounded-xl border-[1.5px]",
+                    icon === key
+                      ? "border-brand-600 bg-brand-100 text-brand-700"
+                      : "border-ink-200 bg-white text-ink-700",
+                  )}
+                >
+                  <Icon className="size-6" strokeWidth={1.8} />
+                </button>
+              ),
+            )}
           </div>
+          <p className="text-xs font-medium text-ink-500">Ketuk lagi untuk memakai ikon otomatis dari nama</p>
         </div>
-      </div>
+      </section>
+      <StickyBar>
+        <MButton variant="outline" size="lg" block onClick={() => router.push("/admin/kategori")}>
+          Batal
+        </MButton>
+        <MButton type="submit" size="lg" block loading={pending}>
+          <CheckIcon className="size-[18px]" />
+          Simpan
+        </MButton>
+      </StickyBar>
     </form>
   );
 }
