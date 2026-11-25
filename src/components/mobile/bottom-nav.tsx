@@ -12,12 +12,15 @@ const ITEMS = [
   { href: "/saya", label: "Saya", icon: UserIcon, match: (p: string) => p.startsWith("/saya") },
 ] as const;
 
+const TAB_PATHS = ["/", "/produk", "/pesanan", "/saya", "/notifikasi"];
+
 export function BottomNav() {
   const pathname = usePathname() ?? "/";
+  if (!TAB_PATHS.includes(pathname)) return null;
   return (
     <nav
       aria-label="Navigasi utama"
-      className="fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[68px] w-full max-w-[430px] border-t border-ink-200 bg-white pb-1.5"
+      className="sticky bottom-0 z-30 flex h-[68px] w-full shrink-0 border-t border-ink-200 bg-white pb-1.5"
     >
       {ITEMS.map(({ href, label, icon: Icon, match }) => {
         const active = match(pathname);
