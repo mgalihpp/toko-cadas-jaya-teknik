@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, count, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, lte, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   CONDITIONS,
@@ -69,6 +69,7 @@ export const adminProductsRouter = createTRPCRouter({
         categoryId: z.uuid().optional(),
         isActive: z.boolean().optional(),
         condition: z.enum(CONDITIONS).optional(),
+        lowStock: z.boolean().optional(),
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(100).default(20),
       })
@@ -84,7 +85,8 @@ export const adminProductsRouter = createTRPCRouter({
           : undefined,
         input.categoryId ? eq(products.categoryId, input.categoryId) : undefined,
         input.isActive !== undefined ? eq(products.isActive, input.isActive) : undefined,
-        input.condition ? eq(products.condition, input.condition) : undefined
+        input.condition ? eq(products.condition, input.condition) : undefined,
+        input.lowStock ? and(eq(products.isActive, true), lte(available, 2)) : undefined
       );
       const [items, [{ total }]] = await Promise.all([
         ctx.db
