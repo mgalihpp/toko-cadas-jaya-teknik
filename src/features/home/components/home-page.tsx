@@ -50,8 +50,10 @@ export async function HomePage() {
 
   return (
     <div className="flex flex-col">
-      <HomeNotice />
-      <HomeHeader />
+      <div className="sticky top-0 z-30">
+        <HomeNotice />
+        <HomeHeader />
+      </div>
       <HeroBanner images={heroImages} />
 
       <section aria-label="Kategori" className="grid grid-cols-5 gap-y-3 bg-white px-2 py-3.5">
@@ -115,8 +117,10 @@ export async function HomePage() {
       {recommended.length > 0 ? (
         <>
           <div className="h-2" />
-          <section className="bg-white pt-3">
-            <h2 className="px-3 text-center text-base font-bold text-ink-900">Rekomendasi</h2>
+          <section className="bg-white">
+            <h2 className="sticky top-[100px] z-20 border-b-2 border-brand-600 bg-white py-3 text-center text-base font-bold text-brand-600">
+              Rekomendasi
+            </h2>
             <div className="grid grid-cols-2 gap-2.5 p-3">
               {recommended.map((product) => (
                 <ProductCard key={product.id} product={product} />
