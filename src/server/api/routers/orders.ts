@@ -7,6 +7,7 @@ import {
   orders,
   orderStatusLogs,
   payments,
+  productImages,
   products,
 } from "@/server/db/schema";
 import {
@@ -150,16 +151,47 @@ export const ordersRouter = createTRPCRouter({
 
   list: customerProcedure.query(async ({ ctx }) => {
     await expireOverdueOrders();
-    return ctx.db.query.orders.findMany({
+    const rows = await ctx.db.query.orders.findMany({
       where: eq(orders.userId, ctx.user.id),
       orderBy: [desc(orders.createdAt)],
       with: { items: true },
     });
+    const productIds = [...new Set(rows.flatMap((o) => o.items.map((i) => i.productId)))];
+    const images =
+      productIds.length === 0
+        ? []
+        : await ctx.db
+            .select()
+            .from(productImages)
+            .where(inArray(productImages.productId, productIds))
+            .orderBy(asc(productImages.position));
+    const firstImage = new Map<string, string>();
+    for (const img of images) if (!firstImage.has(img.productId)) firstImage.set(img.productId, img.url);
+    return rows.map((o) => ({
+      ...o,
+      items: o.items.map((i) => ({ ...i, image: firstImage.get(i.productId) ?? null })),
+    }));
   }),
 
   byCode: customerProcedure.input(codeInput).query(async ({ ctx, input }) => {
     await expireOverdueOrders();
-    return getOwnOrder(ctx.db, ctx.user.id, input.code);
+    const order = await getOwnOrder(ctx.db, ctx.user.id, input.code);
+    const images = await ctx.db
+      .select()
+      .from(productImages)
+      .where(
+        inArray(
+          productImages.productId,
+          order.items.map((i) => i.productId)
+        )
+      )
+      .orderBy(asc(productImages.position));
+    const firstImage = new Map<string, string>();
+    for (const img of images) if (!firstImage.has(img.productId)) firstImage.set(img.productId, img.url);
+    return {
+      ...order,
+      items: order.items.map((i) => ({ ...i, image: firstImage.get(i.productId) ?? null })),
+    };
   }),
 
   cancel: customerProcedure.input(codeInput).mutation(async ({ ctx, input }) => {

@@ -1,24 +1,25 @@
 "use client";
 
-import { ChevronRight, Package, ReceiptText, WifiOff } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ReceiptTextIcon, SearchIcon, StoreIcon, WifiOffIcon, XIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { MButton, MLink } from "@/components/mobile/m-button";
+import { BottomSheet, SheetRoot } from "@/components/mobile/sheet";
+import { TopBar } from "@/components/mobile/top-bar";
+import { useSwipe } from "@/components/mobile/use-swipe";
+import { EmptyState, OrderStatusBadge } from "@/components/shared";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useIsCustomer } from "@/features/cart";
+import { ProductThumb } from "@/features/cart";
 import { formatDate, formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { canUploadProof, ORDER_TABS, type OrderTab } from "../constants";
-import { useOrders } from "../hooks/use-orders";
+import { useTRPCClient } from "@/trpc/client";
+import { canCancel, canUploadProof, ORDER_TABS, type OrderTab } from "../constants";
+import { useCancelOrder, useOrders } from "../hooks/use-orders";
 import type { OrderListItem } from "../types";
-import { OrderStatusBadge } from "@/components/shared";
 
 function matchesTab(order: OrderListItem, tab: OrderTab) {
   const def = ORDER_TABS.find((t) => t.value === tab);
@@ -26,175 +27,306 @@ function matchesTab(order: OrderListItem, tab: OrderTab) {
   return (def.statuses as readonly string[]).includes(order.status);
 }
 
+function OrderCard({
+  order,
+  onCancel,
+}: {
+  order: OrderListItem;
+  onCancel: (code: string) => void;
+}) {
+  const router = useRouter();
+  const client = useTRPCClient();
+  const queryClient = useQueryClient();
+  const [buying, setBuying] = useState(false);
+  const first = order.items[0];
+  const more = order.items.length - 1;
+
+  async function buyAgain() {
+    setBuying(true);
+    try {
+      for (const item of order.items) {
+        await client.cart.add.mutate({ productId: item.productId, quantity: item.quantity });
+      }
+      await queryClient.invalidateQueries();
+      router.push("/keranjang");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal menambahkan ke keranjang");
+    } finally {
+      setBuying(false);
+    }
+  }
+
+  const small = "h-[38px] px-3.5 text-[13px]";
+  return (
+    <li className="flex flex-col gap-2.5 border-t border-ink-200 bg-white p-3">
+      <div className="flex items-center gap-2">
+        <StoreIcon className="size-[18px] text-brand-600" strokeWidth={1.8} />
+        <div className="flex min-w-0 flex-1 flex-col gap-px">
+          <p className="text-sm font-bold text-ink-900">Cadas Jaya Teknik</p>
+          <p className="text-xs text-ink-500">
+            {order.code} · {formatDate(order.createdAt)}
+          </p>
+        </div>
+        <OrderStatusBadge status={order.status} />
+      </div>
+      <Link href={`/pesanan/${order.code}`} className="flex items-center gap-2.5">
+        <ProductThumb src={first?.image ?? null} alt="" className="size-14" />
+        <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+          <p className="line-clamp-2 text-[13px] font-medium text-ink-900">
+            {first?.productName}
+            {more > 0 ? ` dan ${more} produk lain` : ""}
+          </p>
+          <p className="text-sm font-bold text-brand-700">Total: {formatRupiah(order.total)}</p>
+        </div>
+      </Link>
+      <div className="flex justify-end gap-2">
+        {canCancel(order) ? (
+          <MButton variant="outline" className={small} onClick={() => onCancel(order.code)}>
+            Batalkan
+          </MButton>
+        ) : null}
+        {canUploadProof(order) ? (
+          <MLink href={`/pesanan/${order.code}/bayar`} className={cn(small, "px-[18px]")}>
+            Bayar
+          </MLink>
+        ) : null}
+        {order.status === "selesai" || order.status === "dibatalkan" ? (
+          <MButton variant="secondary" className={small} loading={buying} onClick={buyAgain}>
+            Beli lagi
+          </MButton>
+        ) : (
+          <MLink href={`/pesanan/${order.code}`} variant="secondary" className={small}>
+            Lihat detail
+          </MLink>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function OrdersSkeleton() {
+  return (
+    <div role="status" className="flex flex-col gap-2">
+      <span className="sr-only">Memuat riwayat pesanan</span>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="flex flex-col gap-2.5 bg-white p-3">
+          <div className="flex items-center gap-2">
+            <Skeleton className="size-[18px] rounded" />
+            <div className="flex flex-1 flex-col gap-[5px]">
+              <Skeleton className="h-3 w-[120px]" />
+              <Skeleton className="h-2.5 w-[90px]" />
+            </div>
+            <Skeleton className="h-[22px] w-[90px]" />
+          </div>
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="size-14 rounded-lg" />
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-3 w-4/5" />
+              <Skeleton className="h-3.5 w-2/5" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function OrderHistory() {
-  const { data, isPending, isError, refetch, isRefetching } = useOrders();
+  const { session, isPending: sessionPending, isCustomer } = useIsCustomer();
+  const orders = useOrders();
+  const cancel = useCancelOrder();
   const [tab, setTab] = useState<OrderTab>("semua");
+  const [search, setSearch] = useState<string | null>(null);
+  const [cancelCode, setCancelCode] = useState<string | null>(null);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  const index = ORDER_TABS.findIndex((t) => t.value === tab);
+  const go = (delta: number) => {
+    const next = ORDER_TABS[index + delta];
+    if (next) setTab(next.value);
+  };
+  const swipe = useSwipe<HTMLDivElement>({ onLeft: () => go(1), onRight: () => go(-1) });
+
+  useEffect(() => {
+    tabRefs.current[tab]?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [tab]);
+
+  const all = orders.data ?? [];
+  const term = search?.trim().toLowerCase() ?? "";
+  const filtered = all
+    .filter((o) => matchesTab(o, tab))
+    .filter(
+      (o) =>
+        !term ||
+        o.code.toLowerCase().includes(term) ||
+        o.items.some((i) => i.productName.toLowerCase().includes(term)),
+    );
+
+  const searchButton = (
+    <button
+      type="button"
+      aria-label="Cari"
+      onClick={() => setSearch((s) => (s === null ? "" : null))}
+      className="flex size-11 items-center justify-center rounded-full text-brand-700"
+    >
+      {search === null ? (
+        <SearchIcon className="size-6" strokeWidth={1.8} />
+      ) : (
+        <XIcon className="size-6" strokeWidth={1.8} />
+      )}
+    </button>
+  );
+
+  let body: React.ReactNode;
+  if (sessionPending || (isCustomer && orders.isPending)) {
+    body = <OrdersSkeleton />;
+  } else if (!session) {
+    body = (
+      <EmptyState
+        icon={ReceiptTextIcon}
+        title="Masuk untuk melihat pesanan"
+        description="Riwayat pesananmu tersimpan di akun."
+        action={
+          <MLink href="/masuk?next=/pesanan" className="h-[46px] px-6">
+            Masuk
+          </MLink>
+        }
+      />
+    );
+  } else if (!isCustomer) {
+    body = (
+      <EmptyState
+        icon={ReceiptTextIcon}
+        title="Pesanan khusus pelanggan"
+        description="Akun admin mengelola pesanan lewat panel admin."
+        action={
+          <MLink href="/admin/pesanan" className="h-[46px] px-6">
+            Ke panel admin
+          </MLink>
+        }
+      />
+    );
+  } else if (orders.isError) {
+    body = (
+      <EmptyState
+        icon={WifiOffIcon}
+        title="Koneksi terputus"
+        description="Riwayat pesanan belum bisa dimuat. Periksa internet lalu coba lagi."
+        action={
+          <MButton className="px-7" onClick={() => orders.refetch()}>
+            Coba lagi
+          </MButton>
+        }
+      />
+    );
+  } else if (filtered.length === 0) {
+    body = (
+      <EmptyState
+        icon={ReceiptTextIcon}
+        title="Belum ada pesanan"
+        description={
+          all.length === 0
+            ? "Pesanan yang menunggu konfirmasi pembayaran akan muncul di sini."
+            : "Tidak ada pesanan pada kategori ini."
+        }
+        action={
+          <MLink href="/produk" className="h-[46px] px-6">
+            Belanja sekarang
+          </MLink>
+        }
+      />
+    );
+  } else {
+    body = (
+      <ul className="flex flex-col">
+        {filtered.map((order) => (
+          <OrderCard key={order.id} order={order} onCancel={setCancelCode} />
+        ))}
+      </ul>
+    );
+  }
 
   return (
-    <div className="mx-auto w-full min-h-[calc(100svh-64px)] max-w-[1440px] px-4 py-8 sm:px-6 md:py-12 lg:px-20 md:min-h-[calc(100svh-76px)]">
-      <h1 className="font-heading text-3xl font-bold text-ink-900 md:text-[44px] md:leading-tight">
-        Pesanan saya
-      </h1>
-
-      <div
-        role="tablist"
-        aria-label="Filter status pesanan"
-        className="mt-6 flex gap-6 overflow-x-auto border-b border-border"
-      >
+    <div className="flex flex-1 flex-col">
+      <TopBar title="Pesanan saya" backHref="/saya" cart={false} right={searchButton} />
+      {search !== null ? (
+        <div className="border-b border-ink-200 bg-white px-3 py-2">
+          <div className="flex h-11 items-center gap-2 rounded-[10px] bg-ink-50 px-3">
+            <SearchIcon className="size-5 text-brand-600" strokeWidth={2} />
+            <input
+              autoFocus
+              type="search"
+              aria-label="Cari pesanan"
+              placeholder="Cari kode atau nama produk"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-500"
+            />
+          </div>
+        </div>
+      ) : null}
+      <div role="tablist" aria-label="Status pesanan" className="cjt-no-scrollbar flex overflow-x-auto border-b border-ink-200 bg-white">
         {ORDER_TABS.map((t) => {
-          const count = data?.filter((o) => matchesTab(o, t.value)).length ?? 0;
           const active = tab === t.value;
           return (
             <button
               key={t.value}
+              ref={(el) => {
+                tabRefs.current[t.value] = el;
+              }}
               type="button"
               role="tab"
               aria-selected={active}
               onClick={() => setTab(t.value)}
               className={cn(
-                "-mb-px flex shrink-0 items-center gap-2 border-b-2 pb-3 text-sm whitespace-nowrap transition-colors",
-                active
-                  ? "border-ink-900 font-semibold text-ink-900"
-                  : "border-transparent font-medium text-ink-600 hover:text-ink-900"
+                "h-[46px] shrink-0 border-b-[3px] px-3.5 text-sm whitespace-nowrap",
+                active ? "border-brand-600 font-bold text-brand-700" : "border-transparent font-medium text-ink-500",
               )}
             >
               {t.label}
-              {data && (
-                <span
-                  className={cn(
-                    "rounded-full px-1.5 py-px text-[11px] font-bold",
-                    active ? "bg-ink-900 text-white" : "bg-ink-100 text-ink-600"
-                  )}
-                >
-                  {count}
-                </span>
-              )}
             </button>
           );
         })}
       </div>
-
-      <div className="mt-2">
-        {isPending ? (
-          <OrderListSkeleton />
-        ) : isError ? (
-          <Empty className="mt-6 border border-border">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <WifiOff />
-              </EmptyMedia>
-              <EmptyTitle>Gagal memuat pesanan</EmptyTitle>
-              <EmptyDescription>
-                Riwayat pesanan belum bisa dimuat. Periksa internet lalu coba lagi.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button variant="outline" onClick={() => refetch()} disabled={isRefetching}>
-                {isRefetching ? "Memuat..." : "Coba lagi"}
-              </Button>
-            </EmptyContent>
-          </Empty>
-        ) : data.length === 0 ? (
-          <Empty className="mt-6 border border-border">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <ReceiptText />
-              </EmptyMedia>
-              <EmptyTitle>Belum ada pesanan</EmptyTitle>
-              <EmptyDescription>
-                Pesanan yang kamu buat akan muncul di sini beserta statusnya.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button asChild>
-                <Link href="/katalog">Mulai belanja</Link>
-              </Button>
-            </EmptyContent>
-          </Empty>
-        ) : (
-          <OrderRows orders={data.filter((o) => matchesTab(o, tab))} />
-        )}
+      <div ref={swipe} className="flex flex-1 flex-col">
+        {body}
       </div>
-    </div>
-  );
-}
 
-function OrderRows({ orders }: { orders: OrderListItem[] }) {
-  if (orders.length === 0) {
-    return (
-      <p className="py-12 text-center text-sm text-ink-500">
-        Tidak ada pesanan dengan status ini.
-      </p>
-    );
-  }
-  return (
-    <ul>
-      {orders.map((order) => (
-        <OrderRow key={order.id} order={order} />
-      ))}
-    </ul>
-  );
-}
-
-function OrderRow({ order }: { order: OrderListItem }) {
-  const itemCount = order.items.reduce((sum, i) => sum + i.quantity, 0);
-  const href = `/pesanan/${order.code}`;
-  const firstItem = order.items[0]?.productName;
-
-  return (
-    <li className="relative flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-border py-5 sm:flex-nowrap">
-      <div className="flex size-14 shrink-0 items-center justify-center rounded-[10px] border border-border bg-ink-50 text-ink-500">
-        <Package className="size-6" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <Link
-          href={href}
-          className="text-[15px] font-semibold text-ink-900 after:absolute after:inset-0 hover:text-brand-700"
-        >
-          {order.code}
-        </Link>
-        <p className="mt-0.5 truncate text-[13px] text-ink-500">
-          {formatDate(order.createdAt)} · {itemCount} barang
-          {firstItem ? ` · ${firstItem}` : ""}
-        </p>
-      </div>
-      <div className="flex w-full items-center gap-4 sm:w-auto">
-        <OrderStatusBadge status={order.status} />
-        <span className="ml-auto text-[17px] font-bold text-ink-900 sm:ml-0 sm:w-36 sm:text-right">
-          {formatRupiah(order.total)}
-        </span>
-        <div className="hidden w-28 justify-end sm:flex">
-          {canUploadProof(order) && (
-            <Button asChild size="sm" className="relative z-10">
-              <Link href={href}>Upload bukti</Link>
-            </Button>
-          )}
-        </div>
-        <ChevronRight className="hidden size-4 text-ink-500 sm:block" />
-      </div>
-      {canUploadProof(order) && (
-        <Button asChild size="sm" className="relative z-10 w-full sm:hidden">
-          <Link href={href}>Upload bukti</Link>
-        </Button>
-      )}
-    </li>
-  );
-}
-
-function OrderListSkeleton() {
-  return (
-    <ul aria-busy="true" aria-label="Memuat pesanan">
-      {Array.from({ length: 4 }, (_, i) => (
-        <li key={i} className="flex items-center gap-4 border-b border-border py-5">
-          <Skeleton className="size-14 rounded-[10px]" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-36" />
-            <Skeleton className="h-3 w-24" />
+      <SheetRoot open={cancelCode !== null} onOpenChange={(open) => !open && setCancelCode(null)}>
+        <BottomSheet title="Batalkan pesanan">
+          <div className="flex flex-col gap-3 px-4 pt-2 pb-5">
+            <p className="text-[17px] font-bold text-ink-900">Batalkan pesanan?</p>
+            <p className="text-sm text-ink-500">
+              Pesanan {cancelCode} akan dibatalkan dan stok dilepas. Tindakan ini tidak bisa dibatalkan.
+            </p>
+            <div className="flex gap-2.5">
+              <MButton variant="outline" className="flex-1" onClick={() => setCancelCode(null)}>
+                Kembali
+              </MButton>
+              <MButton
+                variant="danger"
+                className="flex-1"
+                loading={cancel.isPending}
+                onClick={() =>
+                  cancelCode &&
+                  cancel.mutate(
+                    { code: cancelCode },
+                    {
+                      onSuccess: () => {
+                        toast.success("Pesanan dibatalkan");
+                        setCancelCode(null);
+                      },
+                      onError: (e) => toast.error(e.message),
+                    },
+                  )
+                }
+              >
+                Batalkan pesanan
+              </MButton>
+            </div>
           </div>
-          <Skeleton className="hidden h-6 w-32 rounded-full sm:block" />
-          <Skeleton className="h-5 w-24" />
-        </li>
-      ))}
-    </ul>
+        </BottomSheet>
+      </SheetRoot>
+    </div>
   );
 }

@@ -118,7 +118,7 @@ export function CheckoutForm({
       onSuccess: ({ code }) => {
         toast.success(`Pesanan ${code} dibuat`);
         onPlaced(code);
-        router.replace(`/pesanan/${code}/bayar`);
+        router.replace(`/pesanan/${code}/berhasil`);
         queryClient.invalidateQueries({ queryKey: cartKey });
       },
       onError: (error) => {

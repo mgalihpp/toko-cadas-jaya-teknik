@@ -2,11 +2,8 @@ import type { OrderStatus } from "./types";
 
 export const ORDER_TABS = [
   { value: "semua", label: "Semua", statuses: null },
-  {
-    value: "belum-dibayar",
-    label: "Belum dibayar",
-    statuses: ["menunggu_pembayaran", "menunggu_konfirmasi"],
-  },
+  { value: "belum-bayar", label: "Belum bayar", statuses: ["menunggu_pembayaran"] },
+  { value: "menunggu-konfirmasi", label: "Menunggu konfirmasi", statuses: ["menunggu_konfirmasi"] },
   { value: "diproses", label: "Diproses", statuses: ["dibayar", "diproses"] },
   { value: "selesai", label: "Selesai", statuses: ["selesai"] },
   { value: "dibatalkan", label: "Dibatalkan", statuses: ["dibatalkan"] },
