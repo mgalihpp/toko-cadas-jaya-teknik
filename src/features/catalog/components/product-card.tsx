@@ -93,7 +93,7 @@ export function ProductCard({
   return (
     <article
       className={cn(
-        "relative flex min-w-0 flex-col overflow-hidden rounded-[10px] border border-ink-200 bg-white",
+        "relative isolate flex min-w-0 flex-col overflow-hidden rounded-[10px] border border-ink-200 bg-white",
         className,
       )}
     >
