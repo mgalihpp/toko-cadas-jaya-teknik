@@ -6,7 +6,7 @@ import { EdgeGestures } from "@/components/mobile/edge-gestures";
 import { PullToRefresh } from "@/components/mobile/pull-to-refresh";
 import { cn } from "@/lib/utils";
 
-const TAB_PATHS = ["/", "/produk", "/pesanan", "/saya", "/notifikasi", "/favorit"];
+const TAB_PATHS = ["/", "/produk", "/pesanan", "/saya", "/notifikasi"];
 
 export function StoreShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "/";

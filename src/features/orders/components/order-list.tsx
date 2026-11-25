@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { ReceiptTextIcon, SearchIcon, StoreIcon, WifiOffIcon, XIcon } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { MButton, MLink } from "@/components/mobile/m-button";
@@ -135,7 +135,10 @@ export function OrderHistory() {
   const { session, isPending: sessionPending, isCustomer } = useIsCustomer();
   const orders = useOrders();
   const cancel = useCancelOrder();
-  const [tab, setTab] = useState<OrderTab>("semua");
+  const initialTab = useSearchParams().get("tab");
+  const [tab, setTab] = useState<OrderTab>(
+    ORDER_TABS.some((t) => t.value === initialTab) ? (initialTab as OrderTab) : "semua",
+  );
   const [search, setSearch] = useState<string | null>(null);
   const [cancelCode, setCancelCode] = useState<string | null>(null);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
