@@ -1,4 +1,4 @@
-import { CogIcon, TriangleAlertIcon } from "lucide-react";
+import { TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -7,12 +7,13 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
     <div className="flex flex-1 flex-col">
       <div className="flex flex-col gap-1.5 bg-gradient-to-b from-brand-700 to-brand-500 px-5 pt-7 pb-10">
         <div className="flex items-center gap-2.5">
-          <span className="flex size-10 items-center justify-center rounded-[10px] bg-white">
-            <CogIcon className="size-6 text-brand-600" strokeWidth={1.8} />
+          <span className="flex size-10 items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.svg" alt="" className="size-9" />
           </span>
           <p className="text-xl font-bold text-white">Cadas Jaya Teknik</p>
         </div>
-        <p className="text-sm text-[#CFE4F6]">Alat dan mesin teknik, baru dan bekas.</p>
+        <p className="text-sm text-[#CFE4F6]">Jual alat dan mesin teknik, baru maupun bekas.</p>
       </div>
       {children}
     </div>

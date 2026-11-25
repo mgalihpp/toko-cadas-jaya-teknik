@@ -14,6 +14,9 @@ const roboto = Roboto({
 export const metadata: Metadata = {
   title: "Cadas Jaya Teknik",
   description: "Toko alat teknik: katalog produk dan pemesanan online",
+  icons: {
+    icon: "/logo.svg",
+  },
 };
 
 export const viewport: Viewport = {

@@ -18,9 +18,9 @@ export function HeroBanner({ images }: { images: string[] }) {
   return (
     <div className="m-3 flex h-[132px] items-center gap-2 overflow-hidden rounded-[14px] bg-gradient-to-br from-brand-700 to-brand-500 px-4">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className="text-xl leading-[1.35] font-bold text-white">Pesta alat teknik</p>
+        <p className="text-xl leading-[1.35] font-bold text-white">Alat teknik lengkap, harga jelas</p>
         <p className="text-[13px] leading-[1.35] text-brand-100">
-          Bor, gerinda, kompresor. Baru dan bekas, harga jelas.
+          Bor, gerinda, dan kompresor, baru maupun bekas. Harga tertera di setiap produk.
         </p>
         <Link
           href="/produk"

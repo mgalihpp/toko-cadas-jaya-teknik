@@ -8,7 +8,7 @@ export function HomeNotice() {
   return (
     <div className="flex h-[30px] items-center justify-center gap-1.5 bg-brand-900 text-xs text-white">
       <TruckIcon className="size-3.5 text-brand-300" strokeWidth={2} />
-      Kirim atau ambil di toko. Bayar tunai atau transfer.
+      Kirim atau ambil sendiri. Tunai atau transfer.
     </div>
   );
 }
