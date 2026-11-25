@@ -138,4 +138,22 @@ export const adminStockRouter = createTRPCRouter({
         .orderBy(desc(stockLogs.createdAt))
         .limit(input.limit)
     ),
+
+  recentLogs: adminProcedure.query(({ ctx }) =>
+    ctx.db
+      .select({
+        id: stockLogs.id,
+        productName: products.name,
+        change: stockLogs.change,
+        reason: stockLogs.reason,
+        note: stockLogs.note,
+        actorName: users.name,
+        createdAt: stockLogs.createdAt,
+      })
+      .from(stockLogs)
+      .innerJoin(products, eq(products.id, stockLogs.productId))
+      .leftJoin(users, eq(users.id, stockLogs.actorId))
+      .orderBy(desc(stockLogs.createdAt))
+      .limit(100)
+  ),
 });
