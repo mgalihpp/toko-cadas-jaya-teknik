@@ -24,7 +24,7 @@ export function EmptyState({
       </span>
       <h2 className="text-lg leading-[1.35] font-bold text-ink-900">{title}</h2>
       {description ? (
-        <p className="max-w-[290px] text-sm leading-[1.35] text-ink-500">{description}</p>
+        <p className="max-w-[290px] text-balance text-sm leading-[1.35] text-ink-500">{description}</p>
       ) : null}
       {action ? <div className="mt-1.5 flex flex-col items-center gap-2.5">{action}</div> : null}
     </div>

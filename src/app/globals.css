@@ -134,6 +134,9 @@
     @apply bg-ink-100 text-foreground;
     overscroll-behavior-y: contain;
   }
+  :is(h1, h2, h3, p).text-center {
+    text-wrap: balance;
+  }
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;

@@ -25,7 +25,7 @@ export function ErrorState({
         <WifiOffIcon className="size-12 text-error" strokeWidth={1.6} />
       </span>
       <h2 className="text-xl leading-[1.35] font-bold text-ink-900">{title}</h2>
-      <p className="text-sm leading-[1.35] text-ink-500">{description}</p>
+      <p className="text-balance text-sm leading-[1.35] text-ink-500">{description}</p>
       {onRetry ? (
         <MButton onClick={onRetry} className="px-7">
           <RefreshCwIcon className="size-[18px]" />
