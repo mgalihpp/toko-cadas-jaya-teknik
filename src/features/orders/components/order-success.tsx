@@ -69,7 +69,7 @@ export function OrderSuccess({ code }: { code: string }) {
         </div>
         {awaitingPay && order.expiresAt ? (
           <p className="text-[13px] text-ink-500">
-            Transfer sebelum {formatDateTime(order.expiresAt)}. Kalau lewat, pesanan batal dan stok dilepas.
+            Selesaikan transfer sebelum {formatDateTime(order.expiresAt)}. Jika terlambat, pesanan dibatalkan otomatis.
           </p>
         ) : null}
         {first ? (
