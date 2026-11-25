@@ -36,3 +36,8 @@ export function serializeWeek(week: WeekHours): string {
     return `${d}: ${h.open ? `${h.from.replace(":", ".")} - ${h.to.replace(":", ".")}` : "Tutup"}`;
   }).join("\n");
 }
+
+export function todayHours(text: string, now = new Date()): DayHours & { day: Day } {
+  const day = DAYS[(now.getDay() + 6) % 7];
+  return { day, ...parseWeek(text)[day] };
+}
