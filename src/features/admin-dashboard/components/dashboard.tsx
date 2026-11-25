@@ -1,348 +1,317 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowRightIcon,
-  FileCheckIcon,
-  PackageIcon,
-  PlusIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
+import { ClockIcon, PackageIcon, ReceiptTextIcon, TriangleAlertIcon, UploadIcon, WalletIcon } from "lucide-react";
 import { io } from "next/cache";
 import Link from "next/link";
-import { use, useState } from "react";
+import { use, useState, type ReactNode } from "react";
+import { AdminBellButton, AdminHeader } from "@/components/layout";
 import { ErrorState, OrderStatusBadge } from "@/components/shared";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useSession } from "@/lib/auth-client";
-import { formatDate, formatDateTime, formatRupiah } from "@/lib/format";
+import { ProductThumb } from "@/features/cart";
+import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { SalesChart, type SalesPoint } from "./sales-chart";
 
 const DAY = 86_400_000;
-const SALES_DAYS = 30;
-const CHART_DAYS = 14;
+const CHART_DAYS = 7;
 const jakartaDay = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Jakarta",
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
 });
-const shortDay = new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", day: "numeric" });
+const weekday = new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", weekday: "short" });
+const clock = new Intl.DateTimeFormat("id-ID", {
+  timeZone: "Asia/Jakarta",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
 
-function greeting(date: Date) {
-  const hour = Number(
-    new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", hour: "numeric", hourCycle: "h23" }).format(date)
+function compactRupiah(value: number) {
+  if (value >= 1_000_000) return `Rp${(value / 1_000_000).toLocaleString("id-ID", { maximumFractionDigits: 1 })} jt`;
+  if (value >= 1_000) return `Rp${Math.round(value / 1_000)} rb`;
+  return `Rp${value}`;
+}
+
+function ago(date: Date) {
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 60000));
+  if (minutes < 60) return `${minutes} mnt`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} jam`;
+  return `${Math.floor(hours / 24)} hari`;
+}
+
+function Kpi({
+  icon,
+  tone,
+  label,
+  value,
+  note,
+  noteTone,
+}: {
+  icon: ReactNode;
+  tone: string;
+  label: string;
+  value: ReactNode;
+  note: string;
+  noteTone: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-ink-200 bg-white p-3">
+      <div className="flex items-center gap-2">
+        <span className={cn("flex size-[34px] items-center justify-center rounded-[10px]", tone)}>{icon}</span>
+        <p className="text-xs font-medium text-ink-500">{label}</p>
+      </div>
+      <p className="text-2xl font-bold text-ink-900">{value}</p>
+      <p className={cn("text-xs font-medium", noteTone)}>{note}</p>
+    </div>
   );
-  if (hour < 11) return "Selamat pagi";
-  if (hour < 15) return "Selamat siang";
-  if (hour < 18) return "Selamat sore";
-  return "Selamat malam";
+}
+
+function Card({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="mx-3 mb-3 flex flex-col gap-2 rounded-xl border border-ink-200 bg-white p-3.5">
+      <div className="flex items-center gap-2">
+        <h2 className="flex-1 text-[15px] font-bold text-ink-900">{title}</h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
 }
 
 export function AdminDashboard() {
   use(io());
   const trpc = useTRPC();
-  const { data: session } = useSession();
   const [range] = useState(() => {
     const hour = 3_600_000;
     const to = new Date(Math.ceil(Date.now() / hour) * hour);
-    return { from: new Date(to.getTime() - SALES_DAYS * DAY), to };
+    return { from: new Date(to.getTime() - 30 * DAY), to };
   });
 
   const dashboard = useQuery(trpc.admin.finance.dashboard.queryOptions());
   const sales = useQuery(trpc.admin.finance.sales.queryOptions({ ...range, groupBy: "day" }));
   const confirmations = useQuery(
-    trpc.admin.orders.list.queryOptions({ status: "menunggu_konfirmasi", pageSize: 5 })
+    trpc.admin.orders.list.queryOptions({ status: "menunggu_konfirmasi", pageSize: 5 }),
   );
-
-  const chartData: SalesPoint[] = (() => {
-    const totals = new Map(sales.data?.rows.map((r) => [r.period, r.total]));
-    return Array.from({ length: CHART_DAYS }, (_, i) => {
-      const date = new Date(range.to.getTime() - (CHART_DAYS - 1 - i) * DAY - 1);
-      const key = jakartaDay.format(date);
-      return { key: formatDate(date), label: shortDay.format(date), total: totals.get(key) ?? 0 };
-    });
-  })();
+  const ready = useQuery(trpc.admin.orders.list.queryOptions({ status: "dibayar", pageSize: 3 }));
 
   const now = new Date();
+  const dateLabel = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(now);
+
+  const chart = (() => {
+    const totals = new Map(sales.data?.rows.map((r) => [r.period, r.total]));
+    const points = Array.from({ length: CHART_DAYS }, (_, i) => {
+      const date = new Date(range.to.getTime() - (CHART_DAYS - 1 - i) * DAY - 1);
+      return { label: weekday.format(date).replace(".", ""), total: totals.get(jakartaDay.format(date)) ?? 0 };
+    });
+    const max = Math.max(1, ...points.map((p) => p.total));
+    return { points, max, sum: points.reduce((s, p) => s + p.total, 0) };
+  })();
+
   const d = dashboard.data;
-
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col gap-1.5">
-          <h1
-            className="font-heading text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl"
-            suppressHydrationWarning
-          >
-            {greeting(now)}
-            {session?.user.name ? `, ${session.user.name}` : ""}
-          </h1>
-          <p className="text-sm text-ink-500" suppressHydrationWarning>
-            {new Intl.DateTimeFormat("id-ID", {
-              timeZone: "Asia/Jakarta",
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            }).format(now)}
-          </p>
-        </div>
-        <Button asChild size="lg">
-          <Link href="/admin/produk/baru">
-            <PlusIcon />
-            Tambah Produk
-          </Link>
-        </Button>
-      </div>
-
-      {dashboard.isError ? (
-        <ErrorState description={dashboard.error.message} onRetry={() => dashboard.refetch()} />
-      ) : (
-        <>
-          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-ink-200 bg-white lg:grid-cols-4">
-            <Kpi
-              label="Penjualan"
-              value={sales.data ? formatRupiah(sales.data.total) : undefined}
-            />
-            <Kpi
-              label="Pesanan perlu diproses"
-              value={d?.inProcess}
-            />
-            <Kpi
-              label="Menunggu konfirmasi"
-              value={d?.awaitingConfirmation}
-              tone={d && d.awaitingConfirmation > 0 ? "info" : undefined}
-            />
-            <Kpi
-              label="Stok menipis"
-              value={d?.lowStock.length}
-              tone={d && d.lowStock.length > 0 ? "warning" : undefined}
-            />
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <Card title="Penjualan 14 hari">
-              {sales.isError ? (
-                <p className="py-16 text-center text-sm text-ink-500">Grafik penjualan gagal dimuat.</p>
-              ) : sales.data ? (
-                <SalesChart data={chartData} />
-              ) : (
-                <Skeleton className="h-64 w-full" />
-              )}
-            </Card>
-
-            <Card
-              title="Perlu tindakan"
-              action={
-                <Link href="/admin/pesanan" className="text-sm font-medium text-brand-600 hover:underline">
-                  Lihat semua
-                </Link>
-              }
-            >
-              <ActionList
-                loading={!d || !confirmations.data}
-                orders={confirmations.data?.items ?? []}
-                lowStock={d?.lowStock ?? []}
-              />
-            </Card>
-          </div>
-
-          <Card
-            title="Pesanan terbaru"
-            action={
-              <Link
-                href="/admin/pesanan"
-                className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline"
-              >
-                Semua pesanan
-                <ArrowRightIcon className="size-3.5" />
-              </Link>
-            }
-            flush
-          >
-            {d && d.latestSales.length === 0 ? (
-              <p className="px-5 py-10 text-center text-sm text-ink-500">Belum ada penjualan.</p>
-            ) : (
-              <Table>
-                <TableHeader className="bg-ink-50">
-                  <TableRow>
-                    <TableHead className="pl-5">Kode</TableHead>
-                    <TableHead>Pelanggan</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="pr-5 text-right">Waktu</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {d
-                    ? d.latestSales.map((o) => (
-                        <TableRow key={o.code}>
-                          <TableCell className="pl-5 font-mono text-xs font-medium">
-                            <Link href={`/admin/pesanan/${o.code}`} className="text-ink-900 hover:text-brand-600">
-                              {o.code}
-                            </Link>
-                          </TableCell>
-                          <TableCell>{o.recipientName}</TableCell>
-                          <TableCell className="text-right font-medium tabular-nums">
-                            {formatRupiah(o.total)}
-                          </TableCell>
-                          <TableCell>
-                            <OrderStatusBadge status={o.status} />
-                          </TableCell>
-                          <TableCell className="pr-5 text-right text-ink-500">
-                            {formatDateTime(o.createdAt)}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    : Array.from({ length: 4 }, (_, i) => (
-                        <TableRow key={i}>
-                          <TableCell colSpan={5} className="px-5">
-                            <Skeleton className="h-7 w-full" />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                </TableBody>
-              </Table>
-            )}
-          </Card>
-        </>
-      )}
-    </div>
+  const delta = d ? d.newToday - d.newYesterday : 0;
+  const header = (
+    <AdminHeader title="Dasbor" subtitle={<span suppressHydrationWarning>{dateLabel}</span>} right={<AdminBellButton />} />
   );
-}
 
-function Kpi({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: React.ReactNode | undefined;
-  tone?: "info" | "warning";
-}) {
-  return (
-    <div className="flex flex-col gap-1 border-ink-200 p-4 not-last:border-r max-lg:nth-2:border-r-0 max-lg:nth-[-n+2]:border-b sm:p-5">
-      <span className="text-sm text-ink-500">{label}</span>
-      {value === undefined ? (
-        <Skeleton className="h-8 w-24" />
-      ) : (
-        <span
-          className={cn(
-            "font-heading text-2xl font-bold text-ink-900 tabular-nums sm:text-3xl",
-            tone === "info" && "text-info",
-            tone === "warning" && "text-warning"
-          )}
-        >
-          {value}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function Card({
-  title,
-  action,
-  flush,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  flush?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="flex flex-col overflow-hidden rounded-xl border border-ink-200 bg-white">
-      <div className="flex items-center justify-between gap-2 px-5 pt-4 pb-3">
-        <h2 className="font-heading text-base font-semibold text-ink-900">{title}</h2>
-        {action}
-      </div>
-      <div className={flush ? undefined : "px-5 pb-5"}>{children}</div>
-    </section>
-  );
-}
-
-function ActionList({
-  loading,
-  orders,
-  lowStock,
-}: {
-  loading: boolean;
-  orders: { code: string; total: number; paymentMethod: "tunai" | "transfer" }[];
-  lowStock: { id: string; name: string; available: number }[];
-}) {
-  if (loading) {
+  if (dashboard.isError) {
     return (
-      <div className="flex flex-col gap-3">
-        {Array.from({ length: 4 }, (_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
-        ))}
+      <div className="flex flex-1 flex-col">
+        {header}
+        <ErrorState description={dashboard.error.message} onRetry={() => dashboard.refetch()} />
       </div>
     );
   }
-  if (orders.length === 0 && lowStock.length === 0) {
-    return <p className="py-10 text-center text-sm text-ink-500">Tidak ada yang perlu ditindaklanjuti.</p>;
-  }
+
+  if (!d) return <DashboardSkeleton header={header} />;
+
+  const actionRows = [
+    ...(confirmations.data?.items ?? []).map((o) => ({
+      key: o.code,
+      code: o.code,
+      total: o.total,
+      text: "Bukti transfer baru diunggah",
+      at: o.createdAt,
+      icon: <UploadIcon className="size-5 text-warning" strokeWidth={2} />,
+      tone: "bg-warning-soft",
+    })),
+    ...(ready.data?.items ?? []).map((o) => ({
+      key: o.code,
+      code: o.code,
+      total: o.total,
+      text: "Siap diproses",
+      at: o.createdAt,
+      icon: <PackageIcon className="size-5 text-brand-600" strokeWidth={2} />,
+      tone: "bg-brand-100",
+    })),
+  ];
+
   return (
-    <ul className="flex flex-col divide-y divide-ink-100">
-      {orders.map((o) => (
-        <ActionRow
-          key={o.code}
-          icon={<FileCheckIcon className="size-4" />}
-          iconClass="bg-info-soft text-info"
-          title={o.code}
-          subtitle={`Bukti ${o.paymentMethod} ${formatRupiah(o.total)}`}
-          href={`/admin/pesanan/${o.code}`}
+    <div className="flex flex-1 flex-col pb-3">
+      {header}
+      <div className="grid grid-cols-2 gap-2.5 p-3">
+        <Kpi
+          icon={<ReceiptTextIcon className="size-5 text-brand-600" strokeWidth={2} />}
+          tone="bg-brand-100"
+          label="Pesanan baru"
+          value={d.newToday}
+          note={delta === 0 ? "Sama seperti kemarin" : `${delta > 0 ? "+" : ""}${delta} dari kemarin`}
+          noteTone="text-brand-600"
         />
-      ))}
-      {lowStock.slice(0, Math.max(1, 5 - orders.length)).map((p) => (
-        <ActionRow
-          key={p.id}
-          icon={p.available <= 0 ? <TriangleAlertIcon className="size-4" /> : <PackageIcon className="size-4" />}
-          iconClass={p.available <= 0 ? "bg-error-soft text-error" : "bg-warning-soft text-warning"}
-          title={p.name}
-          subtitle={p.available <= 0 ? "Stok habis" : `Stok tersisa ${p.available}`}
-          href="/admin/stok"
+        <Kpi
+          icon={<ClockIcon className="size-5 text-warning" strokeWidth={2} />}
+          tone="bg-warning-soft"
+          label="Menunggu konfirmasi"
+          value={d.awaitingConfirmation}
+          note="Cek bukti transfer"
+          noteTone="text-warning"
         />
-      ))}
-    </ul>
+        <Kpi
+          icon={<TriangleAlertIcon className="size-5 text-error" strokeWidth={2} />}
+          tone="bg-error-soft"
+          label="Stok menipis"
+          value={d.lowStock.length}
+          note="Sisa 2 unit atau kurang"
+          noteTone="text-error"
+        />
+        <Kpi
+          icon={<WalletIcon className="size-5 text-success" strokeWidth={2} />}
+          tone="bg-success-soft"
+          label="Penjualan hari ini"
+          value={compactRupiah(d.salesToday.total).replace(".", ",")}
+          note={`${d.salesToday.transactions} transaksi`}
+          noteTone="text-success"
+        />
+      </div>
+
+      <Card
+        title="Penjualan 7 hari"
+        action={
+          <span className="rounded-md bg-success-soft px-2 py-[3px] text-[11px] font-bold text-success">
+            {compactRupiah(chart.sum)}
+          </span>
+        }
+      >
+        <div className="flex items-end gap-2 pt-2">
+          {chart.points.map((p, i) => (
+            <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
+              <div className="flex h-[120px] w-full items-end" title={formatRupiah(p.total)}>
+                <div
+                  className={cn("w-full rounded-t-md", i === chart.points.length - 1 ? "bg-brand-600" : "bg-brand-200")}
+                  style={{ height: `${Math.max(2, (p.total / chart.max) * 100)}%` }}
+                />
+              </div>
+              <p className="text-[11px] font-medium text-ink-500">{p.label}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card
+        title="Perlu tindakan"
+        action={
+          <Link href="/admin/pesanan" className="text-[13px] font-bold text-brand-600">
+            Semua
+          </Link>
+        }
+      >
+        {actionRows.length === 0 ? (
+          <p className="py-6 text-center text-sm text-ink-500">Tidak ada yang perlu ditindaklanjuti.</p>
+        ) : (
+          <ul>
+            {actionRows.map((row) => (
+              <li key={`${row.key}-${row.text}`} className="border-b border-ink-200 last:border-b-0">
+                <Link href={`/admin/pesanan/${row.code}`} className="flex items-center gap-2.5 py-3">
+                  <span className={cn("flex size-[42px] shrink-0 items-center justify-center rounded-xl", row.tone)}>
+                    {row.icon}
+                  </span>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <p className="truncate text-sm font-bold text-ink-900">
+                      {row.code} · {formatRupiah(row.total)}
+                    </p>
+                    <p className="text-xs text-ink-500">{row.text}</p>
+                  </div>
+                  <span className="text-xs text-ink-500">{ago(row.at)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card
+        title="Stok menipis"
+        action={
+          <Link href="/admin/stok" className="text-[13px] font-bold text-brand-600">
+            Kelola stok
+          </Link>
+        }
+      >
+        {d.lowStock.length === 0 ? (
+          <p className="py-4 text-center text-sm text-ink-500">Semua stok aman.</p>
+        ) : (
+          <ul>
+            {d.lowStock.slice(0, 5).map((p) => (
+              <li key={p.id} className="flex items-center gap-2.5 py-1.5">
+                <ProductThumb src={p.image} alt="" className="size-11" />
+                <p className="line-clamp-2 flex-1 text-[13px] font-medium text-ink-900">{p.name}</p>
+                <span className="rounded-md bg-error-soft px-2 py-[3px] text-[11px] font-bold whitespace-nowrap text-error">
+                  {p.available <= 0 ? "Habis" : `Sisa ${p.available}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card title="Penjualan terbaru">
+        {d.latestSales.length === 0 ? (
+          <p className="py-4 text-center text-sm text-ink-500">Belum ada penjualan.</p>
+        ) : (
+          <ul>
+            {d.latestSales.map((o) => (
+              <li key={o.code} className="flex items-center gap-2 border-b border-ink-200 py-2.5 last:border-b-0">
+                <div className="flex min-w-0 flex-1 flex-col gap-px">
+                  <p className="truncate text-sm font-medium text-ink-900">
+                    {o.code} · {o.recipientName}
+                  </p>
+                  <p className="text-xs text-ink-500">
+                    {o.paymentMethod === "transfer" ? "Transfer" : "Tunai"} · {clock.format(new Date(o.createdAt)).replace(":", ".")}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-[3px]">
+                  <p className="text-sm font-bold text-ink-900">{formatRupiah(o.total)}</p>
+                  <OrderStatusBadge status={o.status} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
   );
 }
 
-function ActionRow({
-  icon,
-  iconClass,
-  title,
-  subtitle,
-  href,
-}: {
-  icon: React.ReactNode;
-  iconClass: string;
-  title: string;
-  subtitle: string;
-  href: string;
-}) {
+function DashboardSkeleton({ header }: { header: ReactNode }) {
   return (
-    <li className="flex items-center gap-3 py-2.5">
-      <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", iconClass)}>{icon}</span>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-medium text-ink-900">{title}</span>
-        <span className="truncate text-xs text-ink-500">{subtitle}</span>
+    <div role="status" className="flex flex-1 flex-col">
+      {header}
+      <div className="grid grid-cols-2 gap-2.5 p-3">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-[104px] rounded-xl" />
+        ))}
       </div>
-      <Button asChild variant="outline" size="sm">
-        <Link href={href}>Periksa</Link>
-      </Button>
-    </li>
+      <Skeleton className="mx-3 mb-3 h-[190px] rounded-xl" />
+      <Skeleton className="mx-3 mb-3 h-[210px] rounded-xl" />
+    </div>
   );
 }

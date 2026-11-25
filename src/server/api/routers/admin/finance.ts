@@ -1,7 +1,15 @@
 import { and, asc, count, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { alias } from "drizzle-orm/pg-core";
-import { categories, orderItems, orders, payments, products, users } from "@/server/db/schema";
+import {
+  categories,
+  orderItems,
+  orders,
+  payments,
+  productImages,
+  products,
+  users,
+} from "@/server/db/schema";
 import { expireOverdueOrders } from "@/server/services/orders";
 import { adminProcedure, createTRPCRouter } from "../../trpc";
 import { available, pageCount } from "@/server/db/helpers";
@@ -121,7 +129,9 @@ export const adminFinanceRouter = createTRPCRouter({
 
   dashboard: adminProcedure.query(async ({ ctx }) => {
     await expireOverdueOrders();
-    const [byStatus, lowStock, latestSales] = await Promise.all([
+    const jakartaDate = (col: unknown) => sql`(${col} AT TIME ZONE 'Asia/Jakarta')::date`;
+    const today = sql`(now() AT TIME ZONE 'Asia/Jakarta')::date`;
+    const [byStatus, lowStock, latestSales, created, salesToday] = await Promise.all([
       ctx.db
         .select({ status: orders.status, total: count() })
         .from(orders)
@@ -143,20 +153,49 @@ export const adminFinanceRouter = createTRPCRouter({
           recipientName: orders.recipientName,
           total: orders.total,
           status: orders.status,
+          paymentMethod: orders.paymentMethod,
           createdAt: orders.createdAt,
         })
         .from(orders)
         .where(inArray(orders.status, ["dibayar", "diproses", "selesai"]))
         .orderBy(desc(orders.createdAt))
         .limit(5),
+      ctx.db
+        .select({
+          today: sql<number>`count(*) filter (where ${jakartaDate(orders.createdAt)} = ${today})::int`,
+          yesterday: sql<number>`count(*) filter (where ${jakartaDate(orders.createdAt)} = ${today} - 1)::int`,
+        })
+        .from(orders),
+      ctx.db
+        .select({
+          total: sql<number>`coalesce(sum(${payments.amount}), 0)::int`,
+          transactions: sql<number>`count(distinct ${payments.orderId})::int`,
+        })
+        .from(payments)
+        .where(
+          and(eq(payments.status, "diterima"), sql`${jakartaDate(payments.confirmedAt)} = ${today}`)
+        ),
     ]);
+    const lowIds = lowStock.map((p) => p.id);
+    const lowImages = lowIds.length
+      ? await ctx.db
+          .select()
+          .from(productImages)
+          .where(inArray(productImages.productId, lowIds))
+          .orderBy(asc(productImages.position))
+      : [];
+    const firstImage = new Map<string, string>();
+    for (const img of lowImages) if (!firstImage.has(img.productId)) firstImage.set(img.productId, img.url);
     const counts = Object.fromEntries(byStatus.map((r) => [r.status, r.total]));
     return {
       awaitingPayment: counts.menunggu_pembayaran ?? 0,
       awaitingConfirmation: counts.menunggu_konfirmasi ?? 0,
       inProcess: (counts.dibayar ?? 0) + (counts.diproses ?? 0),
-      lowStock,
+      lowStock: lowStock.map((p) => ({ ...p, image: firstImage.get(p.id) ?? null })),
       latestSales,
+      newToday: created[0]?.today ?? 0,
+      newYesterday: created[0]?.yesterday ?? 0,
+      salesToday: salesToday[0] ?? { total: 0, transactions: 0 },
     };
   }),
 });
