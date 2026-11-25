@@ -25,7 +25,7 @@ export function useOrderActions() {
 
   return {
     confirmTransfer: useMutation(
-      trpc.admin.orders.confirmTransfer.mutationOptions(handlers("Pembayaran dikonfirmasi"))
+      trpc.admin.orders.confirmTransfer.mutationOptions(handlers("Pembayaran diterima. Stok diperbarui."))
     ),
     rejectTransfer: useMutation(
       trpc.admin.orders.rejectTransfer.mutationOptions(
