@@ -1,5 +1,3 @@
-import { StoreShell } from "@/components/layout";
-
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
-  return <StoreShell>{children}</StoreShell>;
+  return <main className="flex flex-1 flex-col">{children}</main>;
 }
