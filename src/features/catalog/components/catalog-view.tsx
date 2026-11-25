@@ -5,6 +5,7 @@ import { ArrowDownUpIcon, ChevronDownIcon, RefreshCwIcon, SearchIcon, SlidersHor
 import { useEffect, useRef, useState } from "react";
 import { MButton } from "@/components/mobile/m-button";
 import { TopBar } from "@/components/mobile/top-bar";
+import { useScrollHidden } from "@/components/mobile/use-scroll-hidden";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -144,11 +145,17 @@ export function CatalogView({ filters }: { filters: CatalogFilters }) {
   const sortLabel = SORT_OPTIONS.find((o) => o.value === filters.sort)?.label ?? "Terbaru";
   const allActive = !filters.condition && !filters.categorySlug;
   const queryKey = JSON.stringify({ ...filters, page: 1 });
+  const scrolledDown = useScrollHidden();
 
   return (
     <div className="flex flex-1 flex-col">
       <TopBar title="Katalog produk" backHref="/" />
-      <div className="flex flex-col gap-2.5 border-b border-ink-200 bg-white px-3 py-2.5">
+      <div
+        className={cn(
+          "sticky top-14 z-10 flex flex-col gap-2.5 border-b border-ink-200 bg-white px-3 py-2.5 transition-transform duration-300 ease-out motion-reduce:transition-none",
+          scrolledDown && "-translate-y-full",
+        )}
+      >
         <div className="flex items-center gap-2">
           <CatalogSearch value={filters.q ?? ""} onSearch={(q) => update({ q })} className="flex-1" />
           <button
