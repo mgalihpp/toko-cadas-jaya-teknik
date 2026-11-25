@@ -1,4 +1,9 @@
-export { ProductCard, type ProductCardData } from "./components/product-card";
+export {
+  FavoriteButton,
+  ProductBadge,
+  ProductCard,
+  type ProductCardData,
+} from "./components/product-card";
 export { ConditionBadge } from "./components/condition-badge";
 export {
   StockIndicator,
@@ -16,7 +21,6 @@ export {
   ProductGridSkeleton,
 } from "./components/skeletons";
 export { CatalogLoadError, ProductNotFound } from "./components/status-views";
-export { CONTAINER } from "./components/container";
 export { useAddToCart } from "./hooks/use-add-to-cart";
 export {
   catalogHref,

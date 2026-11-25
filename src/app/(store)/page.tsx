@@ -1,5 +1,10 @@
-import { HomePage } from "@/features/home";
+import { Suspense } from "react";
+import { HomePage, HomeSkeleton } from "@/features/home";
 
 export default function Page() {
-  return <HomePage />;
+  return (
+    <Suspense fallback={<HomeSkeleton />}>
+      <HomePage />
+    </Suspense>
+  );
 }

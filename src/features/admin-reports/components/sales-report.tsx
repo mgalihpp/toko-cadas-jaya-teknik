@@ -1,368 +1,321 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { format, subDays } from "date-fns";
-import { DownloadIcon } from "lucide-react";
+import { addDays, addMonths, differenceInCalendarDays, format, subDays } from "date-fns";
+import { id as localeId } from "date-fns/locale";
+import {
+  CalendarIcon,
+  ChevronRightIcon,
+  DownloadIcon,
+  FileSpreadsheetIcon,
+  FileTextIcon,
+  ReceiptTextIcon,
+  WalletIcon,
+  XIcon,
+} from "lucide-react";
 import { useState } from "react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { EmptyState, ErrorState, PageHeader } from "@/components/shared";
-import { Button } from "@/components/ui/button";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { AdminHeader, AdminHeaderAction } from "@/components/layout";
+import { BottomSheet, SheetClose, SheetRoot } from "@/components/mobile/sheet";
+import { ErrorState } from "@/components/shared";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { downloadCsv, toCsv } from "../csv";
-import {
-  fillRows,
-  longLabel,
-  resolvePeriod,
-  type ReportMode,
-  type ReportPeriod,
-  type ReportRow,
-} from "../period";
+import { fillRows, longLabel, resolvePeriod, type ReportMode, type ReportPeriod, type ReportRow } from "../period";
+import { buildXlsx, downloadBlob } from "../xlsx";
 
 const MODES: { value: ReportMode; label: string }[] = [
   { value: "harian", label: "Harian" },
   { value: "bulanan", label: "Bulanan" },
-  { value: "rentang", label: "Rentang tanggal" },
+  { value: "rentang", label: "Rentang" },
 ];
 
-const FIRST_YEAR = 2024;
+function compactRupiah(value: number) {
+  if (value >= 1_000_000) return `Rp${(value / 1_000_000).toLocaleString("id-ID", { maximumFractionDigits: 1 })} jt`;
+  if (value >= 1_000) return `Rp${Math.round(value / 1_000)} rb`;
+  return `Rp${value}`;
+}
 
-const compact = new Intl.NumberFormat("id-ID", { notation: "compact", maximumFractionDigits: 1 });
+function weekly(rows: ReportRow[]) {
+  const buckets: { label: string; total: number; transactions: number }[] = [];
+  rows.forEach((r, i) => {
+    const w = Math.floor(i / 7);
+    buckets[w] ??= { label: `Mgg ${w + 1}`, total: 0, transactions: 0 };
+    buckets[w].total += r.total;
+    buckets[w].transactions += r.transactions;
+  });
+  return buckets;
+}
 
-const chartConfig = {
-  total: { label: "Penjualan", color: "var(--chart-1)" },
-} satisfies ChartConfig;
+function previous(period: ReportPeriod, mode: ReportMode): { from: Date; to: Date } {
+  if (mode === "rentang") {
+    const days = differenceInCalendarDays(period.to, period.from);
+    return { from: addDays(period.from, -days), to: period.from };
+  }
+  return { from: addMonths(period.from, -1), to: period.from };
+}
 
 export function SalesReport() {
   const [today] = useState(() => new Date());
   const [mode, setMode] = useState<ReportMode>("bulanan");
   const [month, setMonth] = useState(() => format(today, "yyyy-MM"));
-  const [year, setYear] = useState(() => today.getFullYear());
   const [rangeFrom, setRangeFrom] = useState(() => format(subDays(today, 29), "yyyy-MM-dd"));
   const [rangeTo, setRangeTo] = useState(() => format(today, "yyyy-MM-dd"));
-
-  const resolved = resolvePeriod({ mode, month, year, rangeFrom, rangeTo });
-  const period = "error" in resolved ? null : resolved;
-  const years = Array.from(
-    { length: Math.max(today.getFullYear(), year) - FIRST_YEAR + 1 },
-    (_, i) => FIRST_YEAR + i
-  ).reverse();
-
-  return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Laporan Penjualan"
-        description="Dihitung dari pembayaran yang sudah diterima (pesanan Dibayar, Diproses, dan Selesai)"
-        actions={period ? <ExportButton period={period} /> : null}
-      />
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <div
-          role="radiogroup"
-          aria-label="Jenis periode"
-          className="inline-flex w-full rounded-lg bg-ink-100 p-1 sm:w-auto"
-        >
-          {MODES.map((m) => (
-            <button
-              key={m.value}
-              type="button"
-              role="radio"
-              aria-checked={mode === m.value}
-              onClick={() => setMode(m.value)}
-              className={cn(
-                "h-8 flex-1 rounded-md px-3 text-[13px] whitespace-nowrap transition-colors sm:flex-none",
-                mode === m.value
-                  ? "bg-white font-semibold text-ink-900 shadow-sm"
-                  : "font-medium text-ink-600 hover:text-ink-900"
-              )}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-
-        {mode === "harian" ? (
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="report-month" className="text-xs text-ink-500">
-              Bulan
-            </Label>
-            <Input
-              id="report-month"
-              type="month"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="bg-white sm:w-48"
-            />
-          </div>
-        ) : null}
-        {mode === "bulanan" ? (
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="report-year" className="text-xs text-ink-500">
-              Tahun
-            </Label>
-            <NativeSelect
-              id="report-year"
-              value={String(year)}
-              onChange={(e) => setYear(Number(e.target.value))}
-              className="bg-white"
-            >
-              {years.map((y) => (
-                <NativeSelectOption key={y} value={y}>
-                  {y}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </div>
-        ) : null}
-        {mode === "rentang" ? (
-          <div className="grid grid-cols-2 gap-3 sm:flex">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="report-from" className="text-xs text-ink-500">
-                Dari tanggal
-              </Label>
-              <Input
-                id="report-from"
-                type="date"
-                value={rangeFrom}
-                max={rangeTo || undefined}
-                onChange={(e) => setRangeFrom(e.target.value)}
-                className="bg-white"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="report-to" className="text-xs text-ink-500">
-                Sampai tanggal
-              </Label>
-              <Input
-                id="report-to"
-                type="date"
-                value={rangeTo}
-                min={rangeFrom || undefined}
-                onChange={(e) => setRangeTo(e.target.value)}
-                className="bg-white"
-              />
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      {"error" in resolved ? (
-        <p className="rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm font-medium text-warning">
-          {resolved.error}
-        </p>
-      ) : (
-        <ReportBody period={resolved} />
-      )}
-    </div>
-  );
-}
-
-function useSales(period: ReportPeriod) {
+  const [exportOpen, setExportOpen] = useState(false);
   const trpc = useTRPC();
-  return useQuery(
-    trpc.admin.finance.sales.queryOptions({
-      from: period.from,
-      to: period.to,
-      groupBy: period.groupBy,
-    })
+
+  const resolved = resolvePeriod({
+    mode: mode === "rentang" ? "rentang" : "harian",
+    month,
+    year: today.getFullYear(),
+    rangeFrom,
+    rangeTo,
+  });
+  const period = "error" in resolved ? null : resolved;
+  const prev = period ? previous(period, mode) : null;
+
+  const sales = useQuery(
+    trpc.admin.finance.sales.queryOptions(
+      { from: period?.from ?? today, to: period?.to ?? today, groupBy: "day" },
+      { enabled: Boolean(period) },
+    ),
   );
-}
-
-function ExportButton({ period }: { period: ReportPeriod }) {
-  const sales = useSales(period);
-  return (
-    <Button
-      variant="outline"
-      className="bg-white"
-      disabled={!sales.data}
-      onClick={() => {
-        if (!sales.data) return;
-        const rows = fillRows(period, sales.data.rows);
-        const csv = toCsv([
-          ["Periode", "Tanggal", "Total penjualan (Rp)", "Jumlah transaksi"],
-          ...rows.map((r) => [longLabel(r, period.groupBy), r.period, r.total, r.transactions]),
-          ["Total", "", sales.data.total, sales.data.transactions],
-        ]);
-        const suffix = `${format(period.from, "yyyyMMdd")}-${format(period.to, "yyyyMMdd")}`;
-        downloadCsv(`laporan-penjualan-${period.groupBy === "day" ? "harian" : "bulanan"}-${suffix}.csv`, csv);
-      }}
-    >
-      <DownloadIcon />
-      Ekspor CSV
-    </Button>
+  const prevSales = useQuery(
+    trpc.admin.finance.sales.queryOptions(
+      { from: prev?.from ?? today, to: prev?.to ?? today, groupBy: "day" },
+      { enabled: Boolean(prev) },
+    ),
   );
-}
+  const breakdown = useQuery(
+    trpc.admin.finance.breakdown.queryOptions(
+      { from: period?.from ?? today, to: period?.to ?? today },
+      { enabled: Boolean(period) },
+    ),
+  );
 
-function ReportBody({ period }: { period: ReportPeriod }) {
-  const sales = useSales(period);
+  const rows = period && sales.data ? fillRows(period, sales.data.rows) : [];
+  const bars = mode === "bulanan" ? weekly(rows) : rows.map((r) => ({ label: r.label, total: r.total, transactions: r.transactions }));
+  const max = Math.max(1, ...bars.map((b) => b.total));
+  const peak = bars.reduce((best, b, i) => (b.total > (bars[best]?.total ?? 0) ? i : best), 0);
+  const total = sales.data?.total ?? 0;
+  const count = sales.data?.transactions ?? 0;
+  const prevTotal = prevSales.data?.total ?? 0;
+  const delta = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : null;
 
-  if (sales.isError) return <ErrorState onRetry={() => sales.refetch()} />;
-  if (sales.isPending) {
-    return (
-      <div className="flex flex-col gap-6">
-        <div className="grid gap-4 sm:grid-cols-3">
-          {Array.from({ length: 3 }, (_, i) => (
-            <Skeleton key={i} className="h-28 rounded-2xl" />
-          ))}
-        </div>
-        <Skeleton className="h-80 rounded-2xl" />
-      </div>
+  function doCsv() {
+    if (!period || !sales.data) return;
+    const data = fillRows(period, sales.data.rows);
+    downloadCsv(
+      `laporan-penjualan-${format(period.from, "yyyyMMdd")}.csv`,
+      toCsv([
+        ["Periode", "Tanggal", "Total penjualan (Rp)", "Jumlah transaksi"],
+        ...data.map((r) => [longLabel(r, "day"), r.period, r.total, r.transactions]),
+        ["Total", "", sales.data.total, sales.data.transactions],
+      ]),
     );
   }
 
-  const rows = fillRows(period, sales.data.rows);
-  const { total, transactions } = sales.data;
-  const average = transactions > 0 ? Math.round(total / transactions) : 0;
+  function doXlsx() {
+    if (!period || !sales.data) return;
+    const data = fillRows(period, sales.data.rows);
+    downloadBlob(
+      `laporan-penjualan-${format(period.from, "yyyyMMdd")}.xlsx`,
+      buildXlsx("Penjualan", [
+        ["Periode", "Tanggal", "Total penjualan (Rp)", "Jumlah transaksi"],
+        ...data.map((r) => [longLabel(r, "day"), r.period, r.total, r.transactions]),
+        ["Total", "", sales.data.total, sales.data.transactions],
+      ]),
+    );
+  }
+
+  const exports = [
+    { icon: FileTextIcon, title: "Unduh PDF", hint: "Siap cetak dan dibagikan", run: () => window.print() },
+    { icon: FileSpreadsheetIcon, title: "Unduh Excel (.xlsx)", hint: "Untuk diolah lebih lanjut", run: doXlsx },
+    { icon: DownloadIcon, title: "Unduh CSV", hint: "Data mentah transaksi", run: doCsv },
+  ];
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Kpi label="Total penjualan" value={formatRupiah(total)} hint={period.caption} />
-        <Kpi
-          label="Jumlah transaksi"
-          value={String(transactions)}
-          hint="Dibayar, diproses, dan selesai"
-        />
-        <Kpi
-          label="Rata rata per transaksi"
-          value={formatRupiah(average)}
-          hint={transactions > 0 ? "Total dibagi jumlah transaksi" : "Belum ada transaksi"}
-        />
+    <div className="flex flex-1 flex-col">
+      <AdminHeader
+        title="Laporan penjualan"
+        right={
+          <AdminHeaderAction label="Ekspor" onClick={() => setExportOpen(true)}>
+            <DownloadIcon className="size-6" strokeWidth={1.8} />
+          </AdminHeaderAction>
+        }
+      />
+      <div role="radiogroup" aria-label="Jenis periode" className="m-3 flex rounded-[10px] bg-ink-100 p-[3px] print:hidden">
+        {MODES.map((m) => (
+          <button
+            key={m.value}
+            type="button"
+            role="radio"
+            aria-checked={mode === m.value}
+            onClick={() => setMode(m.value)}
+            className={cn(
+              "h-10 flex-1 rounded-lg text-sm font-bold",
+              mode === m.value ? "bg-white text-brand-700 shadow-[0_1px_4px_rgba(10,40,70,.15)]" : "text-ink-500",
+            )}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
 
-      {transactions === 0 ? (
-        <EmptyState
-          title="Belum ada penjualan"
-          description={`Tidak ada pembayaran diterima pada ${period.caption}.`}
-        />
+      {mode === "rentang" ? (
+        <div className="mx-3 grid grid-cols-2 gap-2 print:hidden">
+          {(
+            [
+              ["Dari tanggal", rangeFrom, setRangeFrom, undefined, rangeTo],
+              ["Sampai tanggal", rangeTo, setRangeTo, rangeFrom, undefined],
+            ] as const
+          ).map(([label, value, set, min, maxDate]) => (
+            <input
+              key={label}
+              type="date"
+              aria-label={label}
+              value={value}
+              min={min}
+              max={maxDate}
+              onChange={(e) => set(e.target.value)}
+              className="h-12 rounded-[10px] border-[1.5px] border-ink-200 bg-white px-3 text-sm font-bold text-ink-900"
+            />
+          ))}
+        </div>
+      ) : (
+        <label className="relative mx-3 flex h-12 items-center gap-2.5 rounded-[10px] border-[1.5px] border-ink-200 bg-white px-3 print:hidden">
+          <CalendarIcon className="size-5 text-brand-600" strokeWidth={1.8} />
+          <span className="flex-1 text-[15px] font-bold text-ink-900">
+            {period ? format(period.from, "MMMM yyyy", { locale: localeId }) : "Pilih bulan"}
+          </span>
+          <ChevronRightIcon className="size-[18px] rotate-90 text-ink-500" />
+          <input
+            type="month"
+            aria-label="Bulan"
+            value={month}
+            onChange={(e) => e.target.value && setMonth(e.target.value)}
+            className="absolute inset-0 cursor-pointer opacity-0"
+          />
+        </label>
+      )}
+
+      {"error" in resolved ? (
+        <p className="m-3 rounded-[10px] border border-warning-border bg-warning-soft px-4 py-3 text-sm font-medium text-warning">
+          {resolved.error}
+        </p>
+      ) : sales.isError ? (
+        <ErrorState description={sales.error.message} onRetry={() => sales.refetch()} />
+      ) : sales.isPending ? (
+        <div role="status" className="flex flex-col gap-2.5 p-3">
+          <div className="grid grid-cols-2 gap-2.5">
+            <Skeleton className="h-[104px] rounded-xl" />
+            <Skeleton className="h-[104px] rounded-xl" />
+          </div>
+          <Skeleton className="h-[200px] rounded-xl" />
+        </div>
       ) : (
         <>
-          <SalesChart rows={rows} groupBy={period.groupBy} />
-          <ReportTable rows={rows} period={period} total={total} transactions={transactions} />
+          <div className="grid grid-cols-2 gap-2.5 p-3">
+            <div className="flex flex-col gap-1.5 rounded-xl border border-ink-200 bg-white p-3">
+              <div className="flex items-center gap-2">
+                <span className="flex size-[34px] items-center justify-center rounded-[10px] bg-success-soft">
+                  <WalletIcon className="size-5 text-success" strokeWidth={2} />
+                </span>
+                <p className="text-xs font-medium text-ink-500">Total penjualan</p>
+              </div>
+              <p className="text-2xl font-bold text-ink-900">{compactRupiah(total).replace(".", ",")}</p>
+              <p className={cn("text-xs font-medium", delta !== null && delta < 0 ? "text-error" : "text-success")}>
+                {delta === null
+                  ? "Belum ada pembanding"
+                  : `${delta >= 0 ? "+" : ""}${delta}% dari ${mode === "rentang" ? "periode" : "bulan"} lalu`}
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5 rounded-xl border border-ink-200 bg-white p-3">
+              <div className="flex items-center gap-2">
+                <span className="flex size-[34px] items-center justify-center rounded-[10px] bg-brand-100">
+                  <ReceiptTextIcon className="size-5 text-brand-600" strokeWidth={2} />
+                </span>
+                <p className="text-xs font-medium text-ink-500">Jumlah transaksi</p>
+              </div>
+              <p className="text-2xl font-bold text-ink-900">{count}</p>
+              <p className="text-xs font-medium text-brand-600">
+                Rata-rata {count > 0 ? compactRupiah(Math.round(total / count)) : "Rp0"}
+              </p>
+            </div>
+          </div>
+
+          <section className="mx-3 flex flex-col gap-2 rounded-xl border border-ink-200 bg-white p-3.5">
+            <h2 className="text-[15px] font-bold text-ink-900">
+              {mode === "bulanan" ? "Penjualan per minggu" : "Penjualan per hari"}
+            </h2>
+            <div className={cn("flex items-end", mode === "bulanan" ? "gap-2" : "gap-0.5")}>
+              {bars.map((b, i) => (
+                <div key={i} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+                  <div className="flex h-[130px] w-full items-end" title={formatRupiah(b.total)}>
+                    <div
+                      className={cn("w-full rounded-t-md", i === peak && b.total > 0 ? "bg-brand-600" : "bg-brand-200")}
+                      style={{ height: `${Math.max(2, (b.total / max) * 100)}%` }}
+                    />
+                  </div>
+                  {mode === "bulanan" || bars.length <= 10 ? (
+                    <p className="text-[11px] font-medium text-ink-500">{b.label}</p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="m-3 flex flex-col rounded-xl border border-ink-200 bg-white p-3.5">
+            <h2 className="text-[15px] font-bold text-ink-900">Produk terlaris</h2>
+            {breakdown.data && breakdown.data.byProduct.length > 0 ? (
+              breakdown.data.byProduct.slice(0, 5).map((p) => (
+                <div key={p.id} className="flex items-center gap-2 border-b border-ink-200 py-2.5 last:border-b-0">
+                  <p className="min-w-0 flex-1 truncate text-sm font-medium text-ink-900">{p.name}</p>
+                  <p className="w-12 text-right text-[13px] text-ink-500">{p.units}</p>
+                  <p className="w-24 text-right text-sm font-bold text-ink-900">{compactRupiah(p.revenue).replace(".", ",")}</p>
+                </div>
+              ))
+            ) : (
+              <p className="py-4 text-center text-sm text-ink-500">Belum ada penjualan pada periode ini.</p>
+            )}
+          </section>
         </>
       )}
+
+      <SheetRoot open={exportOpen} onOpenChange={setExportOpen}>
+        <BottomSheet title="Ekspor laporan">
+          <div className="flex h-12 items-center gap-1 pr-2 pl-4">
+            <p className="flex-1 text-[17px] font-bold text-ink-900">Ekspor laporan</p>
+            <SheetClose aria-label="Tutup" className="flex size-10 items-center justify-center rounded-full text-ink-500">
+              <XIcon className="size-6" strokeWidth={1.8} />
+            </SheetClose>
+          </div>
+          <div className="flex flex-col px-4 pb-6">
+            {exports.map(({ icon: Icon, title, hint, run }) => (
+              <button
+                key={title}
+                type="button"
+                disabled={!sales.data}
+                onClick={() => {
+                  setExportOpen(false);
+                  setTimeout(run, 150);
+                }}
+                className="flex items-center gap-3 border-b border-ink-200 py-2 text-left last:border-b-0 disabled:opacity-50"
+              >
+                <span className="flex size-11 items-center justify-center rounded-xl bg-brand-100">
+                  <Icon className="size-6 text-brand-600" strokeWidth={1.8} />
+                </span>
+                <span className="flex flex-1 flex-col gap-px">
+                  <span className="text-[15px] font-bold text-ink-900">{title}</span>
+                  <span className="text-xs text-ink-500">{hint}</span>
+                </span>
+                <ChevronRightIcon className="size-[18px] text-ink-500" />
+              </button>
+            ))}
+          </div>
+        </BottomSheet>
+      </SheetRoot>
     </div>
-  );
-}
-
-function Kpi({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-2xl border border-ink-200 bg-white p-5">
-      <span className="text-[13px] text-ink-600">{label}</span>
-      <span className="font-heading text-2xl font-bold text-ink-900 sm:text-[28px]">{value}</span>
-      <span className="text-xs text-ink-500">{hint}</span>
-    </div>
-  );
-}
-
-function SalesChart({ rows, groupBy }: { rows: ReportRow[]; groupBy: ReportPeriod["groupBy"] }) {
-  return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-4 sm:p-6">
-      <h2 className="font-heading text-lg font-semibold text-ink-900">
-        Penjualan per {groupBy === "day" ? "hari" : "bulan"}
-      </h2>
-      <ChartContainer config={chartConfig} className="h-72 w-full">
-        <BarChart data={rows} margin={{ left: 0, right: 8, top: 8 }}>
-          <CartesianGrid vertical={false} />
-          <XAxis
-            dataKey="label"
-            tickLine={false}
-            axisLine={false}
-            tickMargin={8}
-            minTickGap={8}
-          />
-          <YAxis
-            tickLine={false}
-            axisLine={false}
-            width={56}
-            tickFormatter={(v: number) => compact.format(v)}
-          />
-          <ChartTooltip
-            cursor={{ fill: "var(--color-ink-100)" }}
-            content={
-              <ChartTooltipContent
-                formatter={(value, _name, item) => (
-                  <div className="flex w-full flex-col gap-0.5">
-                    <span className="font-mono font-medium text-foreground tabular-nums">
-                      {formatRupiah(Number(value))}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {(item.payload as ReportRow).transactions} transaksi
-                    </span>
-                  </div>
-                )}
-              />
-            }
-          />
-          <Bar dataKey="total" fill="var(--color-total)" radius={[4, 4, 0, 0]} />
-        </BarChart>
-      </ChartContainer>
-    </section>
-  );
-}
-
-function ReportTable({
-  rows,
-  period,
-  total,
-  transactions,
-}: {
-  rows: ReportRow[];
-  period: ReportPeriod;
-  total: number;
-  transactions: number;
-}) {
-  return (
-    <section className="overflow-hidden rounded-xl border border-ink-200 bg-white">
-      <Table>
-        <TableHeader className="bg-ink-50">
-          <TableRow>
-            <TableHead className="text-xs font-semibold text-ink-500">Periode</TableHead>
-            <TableHead className="text-right text-xs font-semibold text-ink-500">
-              Transaksi
-            </TableHead>
-            <TableHead className="text-right text-xs font-semibold text-ink-500">
-              Penjualan
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.period} className={row.transactions === 0 ? "text-ink-500" : undefined}>
-              <TableCell className="capitalize">{longLabel(row, period.groupBy)}</TableCell>
-              <TableCell className="text-right">{row.transactions}</TableCell>
-              <TableCell className="text-right font-semibold">{formatRupiah(row.total)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-        <TableFooter>
-          <TableRow>
-            <TableCell className="font-semibold">Total</TableCell>
-            <TableCell className="text-right font-semibold">{transactions}</TableCell>
-            <TableCell className="text-right font-bold">{formatRupiah(total)}</TableCell>
-          </TableRow>
-        </TableFooter>
-      </Table>
-    </section>
   );
 }

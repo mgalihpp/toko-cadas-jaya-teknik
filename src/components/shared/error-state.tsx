@@ -1,47 +1,38 @@
 "use client";
 
-import { RotateCwIcon, TriangleAlertIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+import { RefreshCwIcon, WifiOffIcon } from "lucide-react";
+import { MButton } from "@/components/mobile/m-button";
 import { cn } from "@/lib/utils";
 
 type ErrorStateProps = {
   title?: string;
   description?: React.ReactNode;
   onRetry?: () => void;
+  secondary?: React.ReactNode;
   className?: string;
 };
 
 export function ErrorState({
-  title = "Gagal memuat data",
-  description = "Periksa koneksi internet lalu coba lagi.",
+  title = "Koneksi terputus",
+  description = "Periksa jaringanmu, lalu coba muat ulang. Data yang sudah tampil tetap tersimpan sementara.",
   onRetry,
+  secondary,
   className,
 }: ErrorStateProps) {
   return (
-    <Empty className={cn("border border-error-border bg-error-soft py-12", className)}>
-      <EmptyHeader>
-        <EmptyMedia className="size-14 rounded-full bg-white text-error">
-          <TriangleAlertIcon className="size-6" />
-        </EmptyMedia>
-        <EmptyTitle className="text-base font-semibold text-ink-900">{title}</EmptyTitle>
-        <EmptyDescription className="text-ink-600">{description}</EmptyDescription>
-      </EmptyHeader>
+    <div className={cn("flex flex-col items-center gap-3 px-6 py-24 text-center", className)}>
+      <span className="flex size-[110px] items-center justify-center rounded-full bg-error-soft">
+        <WifiOffIcon className="size-12 text-error" strokeWidth={1.6} />
+      </span>
+      <h2 className="text-xl leading-[1.35] font-bold text-ink-900">{title}</h2>
+      <p className="text-sm leading-[1.35] text-ink-500">{description}</p>
       {onRetry ? (
-        <EmptyContent>
-          <Button variant="outline" onClick={onRetry}>
-            <RotateCwIcon />
-            Coba lagi
-          </Button>
-        </EmptyContent>
+        <MButton onClick={onRetry} className="px-7">
+          <RefreshCwIcon className="size-[18px]" />
+          Coba lagi
+        </MButton>
       ) : null}
-    </Empty>
+      {secondary}
+    </div>
   );
 }

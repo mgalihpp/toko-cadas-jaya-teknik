@@ -44,19 +44,19 @@ export function CatalogSearch({
     <form
       role="search"
       className={cn(
-        "flex h-[42px] items-center gap-2.5 rounded-lg border border-ink-300 bg-white px-3.5 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50",
-        className
+        "flex h-11 items-center gap-2 rounded-[10px] bg-ink-50 px-3 focus-within:ring-2 focus-within:ring-brand-500/40",
+        className,
       )}
       onSubmit={(event) => {
         event.preventDefault();
         submit(text);
       }}
     >
-      <SearchIcon className="size-4 shrink-0 text-ink-500" />
+      <SearchIcon className="size-5 shrink-0 text-brand-600" strokeWidth={2} />
       <input
         type="search"
         aria-label="Cari produk"
-        placeholder="Cari nama atau spesifikasi produk"
+        placeholder="Cari bor, gerinda, kompresor"
         value={text}
         maxLength={100}
         onChange={(event) => setText(event.target.value)}
@@ -70,7 +70,7 @@ export function CatalogSearch({
             setText("");
             submit("");
           }}
-          className="rounded text-ink-500 hover:text-ink-900"
+          className="rounded text-ink-500"
         >
           <XIcon className="size-4" />
         </button>

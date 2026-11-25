@@ -7,6 +7,7 @@ import {
   orders,
   orderStatusLogs,
   payments,
+  productImages,
   products,
 } from "@/server/db/schema";
 import {
@@ -16,7 +17,7 @@ import {
   getOrderForUpdate,
   logStatus,
   lockStockForItems,
-  PAYMENT_WINDOW_MS,
+  getPaymentWindowMs,
 } from "@/server/services/orders";
 import { createTRPCRouter, customerProcedure } from "../trpc";
 import type { Db } from "@/server/db";
@@ -28,6 +29,7 @@ const checkoutInput = z
     fulfillment: z.enum(["kirim", "ambil"]),
     address: z.string().trim().max(500).optional(),
     paymentMethod: z.enum(["tunai", "transfer"]),
+    cartItemIds: z.array(z.uuid()).min(1).optional(),
   })
   .refine((v) => v.fulfillment === "ambil" || (v.address && v.address.length >= 5), {
     path: ["address"],
@@ -62,10 +64,9 @@ export const ordersRouter = createTRPCRouter({
       await expireOverdueOrders();
 
       return ctx.db.transaction(async (tx) => {
-        const cart = await tx
-          .select()
-          .from(cartItems)
-          .where(eq(cartItems.userId, ctx.user.id));
+        const cart = (
+          await tx.select().from(cartItems).where(eq(cartItems.userId, ctx.user.id))
+        ).filter((c) => !input.cartItemIds || input.cartItemIds.includes(c.id));
         if (cart.length === 0) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Keranjang kosong" });
         }
@@ -109,6 +110,7 @@ export const ordersRouter = createTRPCRouter({
           };
         });
 
+        const windowMs = await getPaymentWindowMs(tx);
         const total = lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
         const [order] = await tx
           .insert(orders)
@@ -123,7 +125,7 @@ export const ordersRouter = createTRPCRouter({
             total,
             expiresAt:
               input.paymentMethod === "transfer"
-                ? new Date(Date.now() + PAYMENT_WINDOW_MS)
+                ? new Date(Date.now() + windowMs)
                 : null,
           })
           .returning();
@@ -133,7 +135,15 @@ export const ordersRouter = createTRPCRouter({
           .values(lines.map((l) => ({ ...l, orderId: order.id })));
         await lockStockForItems(tx, lines, order.id, ctx.user.id);
         await logStatus(tx, order.id, null, "menunggu_pembayaran", ctx.user.id, "Pesanan dibuat");
-        await tx.delete(cartItems).where(eq(cartItems.userId, ctx.user.id));
+        await tx.delete(cartItems).where(
+          and(
+            eq(cartItems.userId, ctx.user.id),
+            inArray(
+              cartItems.id,
+              cart.map((c) => c.id)
+            )
+          )
+        );
 
         return { code: order.code, total };
       });
@@ -141,16 +151,47 @@ export const ordersRouter = createTRPCRouter({
 
   list: customerProcedure.query(async ({ ctx }) => {
     await expireOverdueOrders();
-    return ctx.db.query.orders.findMany({
+    const rows = await ctx.db.query.orders.findMany({
       where: eq(orders.userId, ctx.user.id),
       orderBy: [desc(orders.createdAt)],
       with: { items: true },
     });
+    const productIds = [...new Set(rows.flatMap((o) => o.items.map((i) => i.productId)))];
+    const images =
+      productIds.length === 0
+        ? []
+        : await ctx.db
+            .select()
+            .from(productImages)
+            .where(inArray(productImages.productId, productIds))
+            .orderBy(asc(productImages.position));
+    const firstImage = new Map<string, string>();
+    for (const img of images) if (!firstImage.has(img.productId)) firstImage.set(img.productId, img.url);
+    return rows.map((o) => ({
+      ...o,
+      items: o.items.map((i) => ({ ...i, image: firstImage.get(i.productId) ?? null })),
+    }));
   }),
 
   byCode: customerProcedure.input(codeInput).query(async ({ ctx, input }) => {
     await expireOverdueOrders();
-    return getOwnOrder(ctx.db, ctx.user.id, input.code);
+    const order = await getOwnOrder(ctx.db, ctx.user.id, input.code);
+    const images = await ctx.db
+      .select()
+      .from(productImages)
+      .where(
+        inArray(
+          productImages.productId,
+          order.items.map((i) => i.productId)
+        )
+      )
+      .orderBy(asc(productImages.position));
+    const firstImage = new Map<string, string>();
+    for (const img of images) if (!firstImage.has(img.productId)) firstImage.set(img.productId, img.url);
+    return {
+      ...order,
+      items: order.items.map((i) => ({ ...i, image: firstImage.get(i.productId) ?? null })),
+    };
   }),
 
   cancel: customerProcedure.input(codeInput).mutation(async ({ ctx, input }) => {

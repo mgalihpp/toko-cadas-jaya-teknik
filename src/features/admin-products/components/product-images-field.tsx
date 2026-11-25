@@ -1,10 +1,9 @@
 "use client";
 
-import { ArrowLeftIcon, ArrowRightIcon, ImagePlusIcon, XIcon } from "lucide-react";
+import { CameraIcon, ImageIcon, Loader2Icon, XIcon } from "lucide-react";
+import { useRef } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { UploadDropzone } from "@/lib/uploadthing";
-import { cn } from "@/lib/utils";
+import { useUploadThing } from "@/lib/uploadthing";
 import { MAX_IMAGES, type ProductImage } from "../schemas";
 
 type Props = {
@@ -13,117 +12,92 @@ type Props = {
 };
 
 export function ProductImagesField({ images, onChange }: Props) {
+  const input = useRef<HTMLInputElement>(null);
   const remaining = MAX_IMAGES - images.length;
+  const { startUpload, isUploading } = useUploadThing("productImage", {
+    onClientUploadComplete: (res) => {
+      const added = res.map((r) => ({ url: r.serverData.url, fileKey: r.serverData.key }));
+      onChange([...images, ...added].slice(0, MAX_IMAGES));
+      toast.success(`${added.length} foto diunggah`);
+    },
+    onUploadError: (error) => {
+      toast.error(error.message || "Gagal mengunggah foto");
+    },
+  });
 
-  function move(index: number, delta: number) {
-    const next = [...images];
-    const [item] = next.splice(index, 1);
-    next.splice(index + delta, 0, item);
-    onChange(next);
+  async function pick(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const list = Array.from(files);
+    if (list.length > remaining) {
+      toast.error(`Maksimal ${MAX_IMAGES} foto. Hanya ${remaining} foto pertama yang diunggah.`);
+    }
+    await startUpload(list.slice(0, remaining));
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {images.length > 0 ? (
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {images.map((img, i) => (
-            <li
-              key={img.url}
-              className={cn(
-                "group relative aspect-square overflow-hidden rounded-lg border bg-ink-50",
-                i === 0 ? "border-brand-500 ring-2 ring-brand-100" : "border-ink-200"
-              )}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- URL UploadThing belum terdaftar di images.remotePatterns */}
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap gap-2.5">
+        {remaining > 0 ? (
+          <button
+            type="button"
+            disabled={isUploading}
+            onClick={() => input.current?.click()}
+            className="flex size-[92px] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-brand-500 bg-brand-50 text-xs font-bold text-brand-700"
+          >
+            {isUploading ? <Loader2Icon className="size-6 animate-spin" /> : <CameraIcon className="size-6" strokeWidth={1.8} />}
+            {isUploading ? "Mengunggah" : "Tambah"}
+          </button>
+        ) : null}
+        {images.map((img, i) => (
+          <div key={img.url} className="relative size-[92px]">
+            <div className="size-full overflow-hidden rounded-xl bg-ink-100">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={img.url} alt={`Foto produk ${i + 1}`} className="size-full object-cover" />
-              {i === 0 ? (
-                <span className="absolute top-2 left-2 rounded-md bg-brand-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
-                  Sampul
-                </span>
-              ) : null}
-              <Button
+            </div>
+            <button
+              type="button"
+              aria-label={`Hapus foto ${i + 1}`}
+              onClick={() => onChange(images.filter((_, j) => j !== i))}
+              className="absolute -top-1.5 -right-1.5 flex size-[22px] items-center justify-center rounded-full bg-toast text-white"
+            >
+              <XIcon className="size-3.5" />
+            </button>
+            {i === 0 ? (
+              <span className="absolute bottom-1.5 left-1.5 rounded bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                Utama
+              </span>
+            ) : (
+              <button
                 type="button"
-                size="icon-xs"
-                variant="secondary"
-                className="absolute top-2 right-2 bg-white/90 shadow-sm"
-                onClick={() => onChange(images.filter((_, j) => j !== i))}
-                aria-label={`Hapus foto ${i + 1}`}
+                aria-label={`Jadikan foto ${i + 1} utama`}
+                onClick={() => {
+                  const next = [...images];
+                  const [item] = next.splice(i, 1);
+                  next.unshift(item);
+                  onChange(next);
+                }}
+                className="absolute bottom-1.5 left-1.5 flex items-center gap-0.5 rounded bg-toast/80 px-1.5 py-0.5 text-[10px] font-bold text-white"
               >
-                <XIcon />
-              </Button>
-              <div className="absolute inset-x-2 bottom-2 flex justify-between">
-                <Button
-                  type="button"
-                  size="icon-xs"
-                  variant="secondary"
-                  className="bg-white/90 shadow-sm disabled:invisible"
-                  disabled={i === 0}
-                  onClick={() => move(i, -1)}
-                  aria-label="Geser ke kiri"
-                >
-                  <ArrowLeftIcon />
-                </Button>
-                <Button
-                  type="button"
-                  size="icon-xs"
-                  variant="secondary"
-                  className="bg-white/90 shadow-sm disabled:invisible"
-                  disabled={i === images.length - 1}
-                  onClick={() => move(i, 1)}
-                  aria-label="Geser ke kanan"
-                >
-                  <ArrowRightIcon />
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {remaining > 0 ? (
-        <UploadDropzone
-          endpoint="productImage"
-          config={{ mode: "auto" }}
-          onBeforeUploadBegin={(files) => {
-            if (files.length > remaining) {
-              toast.error(`Maksimal ${MAX_IMAGES} foto. Hanya ${remaining} foto pertama yang diunggah.`);
-            }
-            return files.slice(0, remaining);
-          }}
-          onClientUploadComplete={(res) => {
-            const added = res.map((r) => ({ url: r.serverData.url, fileKey: r.serverData.key }));
-            onChange([...images, ...added].slice(0, MAX_IMAGES));
-            toast.success(`${added.length} foto diunggah`);
-          }}
-          onUploadError={(error) => {
-            toast.error(error.message || "Gagal mengunggah foto");
-          }}
-          appearance={{
-            container: ({ isDragActive }) =>
-              cn(
-                "m-0 flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors",
-                isDragActive ? "border-brand-500 bg-brand-50" : "border-ink-300 bg-ink-50 hover:bg-ink-100"
-              ),
-            uploadIcon: "size-8 text-ink-500",
-            label: "text-sm font-medium text-ink-700",
-            allowedContent: "text-xs text-ink-500",
-            button: ({ isUploading }) =>
-              cn(
-                "h-8 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground",
-                isUploading && "bg-brand-500"
-              ),
-          }}
-          content={{
-            uploadIcon: <ImagePlusIcon className="size-8 text-ink-500" />,
-            label: "Tarik foto atau klik untuk memilih",
-            allowedContent: `JPG, PNG, WebP, maks 2 MB. Sisa ${remaining} foto`,
-            button: ({ isUploading, uploadProgress }) =>
-              isUploading ? `Mengunggah ${uploadProgress}%` : "Pilih foto",
-          }}
-        />
-      ) : (
-        <p className="text-sm text-ink-500">Batas {MAX_IMAGES} foto tercapai. Hapus foto untuk menambah yang baru.</p>
-      )}
+                <ImageIcon className="size-2.5" />
+                Utama
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-ink-500">JPG, PNG, atau WebP · maksimal 2 MB per foto</p>
+      <input
+        ref={input}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        className="sr-only"
+        tabIndex={-1}
+        onChange={(e) => {
+          void pick(e.target.files);
+          e.target.value = "";
+        }}
+      />
     </div>
   );
 }

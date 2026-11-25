@@ -1,12 +1,17 @@
-import { SiteFooter } from "./site-footer";
-import { SiteHeader } from "./site-header";
+import { Suspense } from "react";
+import { BottomNav } from "@/components/mobile/bottom-nav";
+import { EdgeGestures } from "@/components/mobile/edge-gestures";
+import { PullToRefresh } from "@/components/mobile/pull-to-refresh";
 
 export function StoreShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-svh flex-col bg-white">
-      <SiteHeader />
+    <>
       <main className="flex flex-1 flex-col">{children}</main>
-      <SiteFooter />
-    </div>
+      <Suspense fallback={null}>
+        <BottomNav />
+        <EdgeGestures />
+      </Suspense>
+      <PullToRefresh />
+    </>
   );
 }

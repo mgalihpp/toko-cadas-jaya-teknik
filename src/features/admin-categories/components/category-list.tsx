@@ -1,212 +1,154 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FolderIcon, InfoIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { FolderIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
-import { EmptyState, ErrorState, PageHeader } from "@/components/shared";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import { AdminHeader, AdminHeaderAction } from "@/components/layout";
+import { MButton } from "@/components/mobile/m-button";
+import { BottomSheet, SheetRoot } from "@/components/mobile/sheet";
+import { EmptyState, ErrorState } from "@/components/shared";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { CategoryDialog, type CategoryDialogState } from "./category-dialog";
-
-type Category = { id: string; name: string; productCount: number };
+import { CategoryIcon } from "./category-icon";
 
 export function CategoryList() {
   const trpc = useTRPC();
-  const categories = useQuery(trpc.admin.categories.list.queryOptions());
-  const [dialog, setDialog] = useState<CategoryDialogState>(null);
-  const [toDelete, setToDelete] = useState<Category | null>(null);
-
-  const addButton = (
-    <Button size="lg" onClick={() => setDialog({ mode: "create" })}>
-      <PlusIcon />
-      Tambah Kategori
-    </Button>
-  );
-
-  return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Kategori"
-        description={categories.data ? `${categories.data.length} kategori` : "Memuat kategori..."}
-        actions={addButton}
-      />
-
-      {categories.isError ? (
-        <ErrorState description={categories.error.message} onRetry={() => categories.refetch()} />
-      ) : categories.data?.length === 0 ? (
-        <EmptyState
-          icon={FolderIcon}
-          title="Belum ada kategori"
-          description="Kategori membantu pelanggan menyaring produk di katalog."
-          action={addButton}
-        />
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-ink-200 bg-white">
-          <Table>
-            <TableHeader className="bg-ink-50">
-              <TableRow>
-                <TableHead className="pl-4">Nama</TableHead>
-                <TableHead>Slug</TableHead>
-                <TableHead className="text-right">Produk</TableHead>
-                <TableHead className="w-24 pr-4">
-                  <span className="sr-only">Aksi</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {categories.data
-                ? categories.data.map((c) => (
-                    <TableRow key={c.id}>
-                      <TableCell className="pl-4 font-medium text-ink-900">{c.name}</TableCell>
-                      <TableCell className="font-mono text-xs text-ink-500">/{c.slug}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {c.productCount > 0 ? (
-                          c.productCount
-                        ) : (
-                          <span className="text-ink-500">0</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="pr-4">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => setDialog({ mode: "edit", id: c.id, name: c.name })}
-                            aria-label={`Ubah ${c.name}`}
-                          >
-                            <PencilIcon />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-error hover:bg-error-soft hover:text-error"
-                            onClick={() => setToDelete(c)}
-                            aria-label={`Hapus ${c.name}`}
-                          >
-                            <Trash2Icon />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                : Array.from({ length: 5 }, (_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={4} className="px-4">
-                        <Skeleton className="h-7 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-            </TableBody>
-          </Table>
-          <p className="flex items-center gap-2 border-t border-ink-200 bg-ink-50 px-4 py-3 text-sm text-ink-600">
-            <InfoIcon className="size-4 shrink-0 text-ink-500" />
-            Kategori yang masih dipakai produk tidak bisa dihapus. Pindahkan produknya dulu.
-          </p>
-        </div>
-      )}
-
-      <CategoryDialog state={dialog} onOpenChange={(open) => !open && setDialog(null)} />
-      <DeleteCategoryDialog category={toDelete} onClose={() => setToDelete(null)} />
-    </div>
-  );
-}
-
-function DeleteCategoryDialog({
-  category,
-  onClose,
-}: {
-  category: Category | null;
-  onClose: () => void;
-}) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const categories = useQuery(trpc.admin.categories.list.queryOptions());
+  const [q, setQ] = useState("");
+  const [toDelete, setToDelete] = useState<{ id: string; name: string } | null>(null);
+
   const remove = useMutation(
     trpc.admin.categories.delete.mutationOptions({
       onSuccess: async () => {
         toast.success("Kategori dihapus");
-        close();
+        setToDelete(null);
         await Promise.all([
           queryClient.invalidateQueries(trpc.admin.categories.pathFilter()),
           queryClient.invalidateQueries(trpc.catalog.pathFilter()),
         ]);
       },
-    })
+      onError: (error) => toast.error(error.message),
+    }),
   );
 
-  function close() {
-    remove.reset();
-    onClose();
-  }
-
-  const blocked = remove.error?.data?.code === "CONFLICT";
+  const rows = (categories.data ?? []).filter((c) => c.name.toLowerCase().includes(q.trim().toLowerCase()));
 
   return (
-    <AlertDialog open={category !== null} onOpenChange={(open) => !open && close()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogMedia className="bg-error-soft text-error">
-            <Trash2Icon />
-          </AlertDialogMedia>
-          <AlertDialogTitle>
-            {blocked ? "Kategori tidak bisa dihapus" : "Hapus kategori ini?"}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {remove.error ? (
-              <>
-                {remove.error.message}.{" "}
-                {blocked ? (
-                  <Link href="/admin/produk" className="font-medium text-brand-600">
-                    Lihat produk
-                  </Link>
-                ) : null}
-              </>
-            ) : (
-              <>
-                Kategori <span className="font-medium text-ink-900">{category?.name}</span> akan
-                dihapus permanen.
-                {category && category.productCount > 0
-                  ? ` Kategori ini masih dipakai ${category.productCount} produk.`
-                  : null}
-              </>
-            )}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={remove.isPending}>{blocked ? "Tutup" : "Batal"}</AlertDialogCancel>
-          {blocked ? null : (
-            <Button
-              variant="destructive"
-              disabled={remove.isPending}
-              onClick={() => category && remove.mutate({ id: category.id })}
-            >
-              {remove.isPending ? <Spinner /> : <Trash2Icon />}
-              Hapus
-            </Button>
-          )}
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <div className="flex flex-1 flex-col">
+      <AdminHeader
+        title="Kategori"
+        right={
+          <AdminHeaderAction label="Tambah kategori" href="/admin/kategori/baru">
+            <PlusIcon className="size-6" strokeWidth={1.8} />
+          </AdminHeaderAction>
+        }
+      />
+      <div className="bg-white px-3 py-2.5">
+        <div className="flex h-11 items-center gap-2 rounded-[10px] bg-ink-50 px-3">
+          <SearchIcon className="size-5 text-brand-600" strokeWidth={2} />
+          <input
+            type="search"
+            aria-label="Cari kategori"
+            placeholder="Cari kategori"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-500"
+          />
+        </div>
+      </div>
+
+      {categories.isError ? (
+        <ErrorState description={categories.error.message} onRetry={() => categories.refetch()} />
+      ) : !categories.data ? (
+        <div role="status" className="flex flex-col">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-2 border-b border-ink-200 bg-white p-3">
+              <Skeleton className="size-[42px] rounded-xl" />
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Skeleton className="h-3.5 w-24" />
+                <Skeleton className="h-3 w-14" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
+        <EmptyState
+          icon={FolderIcon}
+          title={q ? "Kategori tidak ditemukan" : "Belum ada kategori"}
+          description={q ? "Coba kata kunci lain." : "Kategori membantu pelanggan menyaring produk di katalog."}
+        />
+      ) : (
+        <ul>
+          {rows.map((c) => {
+            const used = c.productCount > 0;
+            return (
+              <li key={c.id} className="flex items-center gap-2 border-b border-ink-200 bg-white py-2 pr-2 pl-3">
+                <span className="flex size-[42px] shrink-0 items-center justify-center rounded-xl bg-brand-100">
+                  <CategoryIcon slug={c.slug} icon={c.icon} className="size-6 text-brand-600" />
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-px">
+                  <p className="truncate text-[15px] font-bold text-ink-900">{c.name}</p>
+                  <p className="text-xs text-ink-500">{c.productCount} produk</p>
+                </div>
+                <Link
+                  href={`/admin/kategori/${c.id}`}
+                  aria-label={`Ubah ${c.name}`}
+                  className="flex size-10 items-center justify-center rounded-full text-brand-600"
+                >
+                  <PencilIcon className="size-5" strokeWidth={1.8} />
+                </Link>
+                <button
+                  type="button"
+                  aria-label={`Hapus ${c.name}`}
+                  disabled={used}
+                  title={used ? "Kategori masih dipakai produk" : undefined}
+                  onClick={() => setToDelete({ id: c.id, name: c.name })}
+                  className={cn(
+                    "flex size-10 items-center justify-center rounded-full",
+                    used ? "text-[#B6C2CD]" : "text-error",
+                  )}
+                >
+                  <Trash2Icon className="size-5" strokeWidth={1.8} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <SheetRoot open={toDelete !== null} onOpenChange={(open) => !open && setToDelete(null)}>
+        <BottomSheet title="Hapus kategori">
+          <div className="flex flex-col gap-3 px-4 pt-2 pb-5">
+            <div className="flex gap-2.5 rounded-[10px] border border-error-border bg-error-soft p-3">
+              <TriangleAlertIcon className="size-5 shrink-0 text-error" strokeWidth={2} />
+              <div className="flex flex-col gap-0.5">
+                <p className="text-sm font-bold text-error">Hapus kategori?</p>
+                <p className="text-[13px] text-ink-900">
+                  Kategori {toDelete?.name} akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2.5">
+              <MButton variant="outline" size="lg" className="w-[110px]" onClick={() => setToDelete(null)}>
+                Batal
+              </MButton>
+              <MButton
+                variant="danger"
+                size="lg"
+                block
+                loading={remove.isPending}
+                onClick={() => toDelete && remove.mutate({ id: toDelete.id })}
+              >
+                Hapus kategori
+              </MButton>
+            </div>
+          </div>
+        </BottomSheet>
+      </SheetRoot>
+    </div>
   );
 }

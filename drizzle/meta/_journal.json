@@ -8,6 +8,27 @@
       "when": 1795062870251,
       "tag": "0000_workable_jubilee",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795219106436,
+      "tag": "0001_smart_ben_grimm",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795219526645,
+      "tag": "0002_early_gertrude_yorkes",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795593788439,
+      "tag": "0003_yellow_bishop",
+      "breakpoints": true
     }
   ]
 }

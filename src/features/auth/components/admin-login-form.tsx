@@ -1,16 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { LockIcon, MailIcon, ShieldCheckIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { CircleXIcon, LockIcon } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { MButton } from "@/components/mobile/m-button";
 import { authClient } from "@/lib/auth-client";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import { authErrorMessage } from "../lib";
 import { fieldErrorsOf, loginSchema, type FieldErrors, type LoginInput } from "../schemas";
 import { AuthField } from "./auth-field";
-import { BrandMark } from "./auth-shell";
+import { AuthBanner } from "./auth-shell";
 
 const NOT_ADMIN = "Akun ini tidak punya akses ke panel admin.";
 
@@ -29,7 +28,6 @@ export function AdminLoginForm() {
   function fail(message: string) {
     setPending(false);
     setFormError(message);
-    toast.error(message);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -56,69 +54,55 @@ export function AdminLoginForm() {
   }
 
   return (
-    <div className="flex min-h-svh flex-1 items-center justify-center bg-surface px-4 py-10">
+    <div className="flex flex-1 flex-col">
+      <div className="flex flex-col gap-2.5 bg-gradient-to-b from-brand-900 to-brand-600 px-5 pt-14 pb-14">
+        <span className="flex size-[52px] items-center justify-center rounded-[14px] bg-white">
+          <ShieldCheckIcon className="size-7 text-brand-600" strokeWidth={1.8} />
+        </span>
+        <h1 className="text-[26px] leading-[1.35] font-bold text-white">Panel Admin</h1>
+        <p className="text-sm text-[#CFE4F6]">Cadas Jaya Teknik. Khusus Owner dan pengelola toko.</p>
+      </div>
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="flex w-full max-w-[420px] flex-col gap-6 rounded-2xl border border-border bg-white p-6 sm:p-10"
+        className="relative z-10 mx-4 -mt-6 flex flex-col gap-3.5 rounded-2xl bg-white p-[18px] shadow-[0_8px_24px_rgba(10,40,70,.14)]"
       >
-        <div className="flex items-center gap-2.5">
-          <BrandMark size="lg" />
-          <div className="flex flex-col">
-            <span className="font-heading text-[17px] font-bold text-ink-900">Cadas Jaya Teknik</span>
-            <span className="text-xs text-ink-500">Panel Owner</span>
-          </div>
-        </div>
-
-        <h1 className="font-heading text-[28px] font-bold text-ink-900">Masuk ke panel</h1>
-
-        {formError && (
-          <div
-            role="alert"
-            className="flex items-center gap-2.5 rounded-[10px] border border-error-border bg-error-soft p-3 text-[13px] font-medium text-error"
-          >
-            <CircleXIcon className="size-4 shrink-0" aria-hidden />
+        {formError ? (
+          <AuthBanner tone="error" title="Gagal masuk">
             {formError}
-          </div>
-        )}
-
+          </AuthBanner>
+        ) : null}
         <AuthField
           id="email"
-          label="Email"
+          label="Email admin"
+          icon={MailIcon}
           type="email"
           autoComplete="username"
           inputMode="email"
-          placeholder="owner@cadasjayateknik.com"
+          placeholder="owner@cadasjaya.id"
           value={values.email}
           onValueChange={(value) => setField("email", value)}
           error={errors.email}
+          invalid={Boolean(formError)}
           disabled={pending}
         />
         <AuthField
           id="password"
           label="Kata sandi"
+          icon={LockIcon}
           type="password"
           autoComplete="current-password"
           placeholder="Masukkan kata sandi"
           value={values.password}
           onValueChange={(value) => setField("password", value)}
           error={errors.password}
+          invalid={Boolean(formError)}
           disabled={pending}
         />
-
-        <Button
-          type="submit"
-          disabled={pending}
-          className="h-[46px] w-full bg-ink-900 text-sm font-semibold text-white hover:bg-ink-800"
-        >
-          {pending && <Spinner />}
-          {pending ? "Memproses..." : "Masuk"}
-        </Button>
-
-        <p className="flex items-center justify-center gap-2 text-xs text-ink-500">
-          <LockIcon className="size-3.5" aria-hidden />
-          Khusus Admin dan Owner
-        </p>
+        <MButton type="submit" size="lg" block loading={pending}>
+          {pending ? "Memproses…" : "Masuk ke panel"}
+        </MButton>
+        <p className="text-center text-xs text-ink-500">Halaman admin tidak bisa dibuka tanpa login.</p>
       </form>
     </div>
   );

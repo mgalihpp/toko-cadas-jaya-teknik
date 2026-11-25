@@ -1,100 +1,127 @@
 "use client";
 
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { ChevronRightIcon, SearchXIcon, SlidersHorizontalIcon, XIcon } from "lucide-react";
-import Link from "next/link";
-import { EmptyState } from "@/components/shared";
-import { Button } from "@/components/ui/button";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { ArrowDownUpIcon, ChevronDownIcon, RefreshCwIcon, SearchIcon, SlidersHorizontalIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { MButton } from "@/components/mobile/m-button";
+import { TopBar } from "@/components/mobile/top-bar";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useCatalogNavigation } from "../hooks/use-catalog-navigation";
 import {
-  catalogHref,
+  CATALOG_PAGE_SIZE,
   hasActiveFilters,
   SORT_OPTIONS,
   toProductListInput,
   type CatalogFilters,
   type CatalogSort,
 } from "../schemas";
-import { CatalogFilterPanel } from "./catalog-filters";
-import { CatalogPagination } from "./catalog-pagination";
+import type { ProductSummary } from "../types";
+import { CatalogFilterSheet } from "./catalog-filter-sheet";
 import { CatalogSearch } from "./catalog-search";
-import { CONTAINER } from "./container";
 import { ProductCard } from "./product-card";
+import { ProductCardSkeleton } from "./skeletons";
 
-function ActiveFilterChips({
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-[34px] shrink-0 items-center rounded-[17px] border-[1.5px] px-3.5 text-[13px] font-bold whitespace-nowrap",
+        active ? "border-brand-600 bg-brand-600 text-white" : "border-ink-200 bg-white text-ink-900",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function emptyDescription(filters: CatalogFilters) {
+  const parts: string[] = [];
+  if (filters.condition) parts.push(`filter ${filters.condition === "baru" ? "Baru" : "Bekas"}`);
+  if (filters.maxPrice !== undefined) parts.push(`harga di bawah ${formatRupiah(filters.maxPrice)}`);
+  else if (filters.minPrice !== undefined) parts.push(`harga mulai ${formatRupiah(filters.minPrice)}`);
+  if (filters.inStock) parts.push("stok tersedia");
+  const target = filters.q ? `Tidak ada hasil untuk "${filters.q}"` : "Tidak ada hasil";
+  const withFilters = parts.length > 0 ? ` dengan ${parts.join(" dan ")}` : "";
+  return `${target}${withFilters}. Coba kata kunci lain atau longgarkan filter.`;
+}
+
+function MoreProducts({
   filters,
-  categoryName,
-  onChange,
-  onReset,
+  firstPageCount,
+  total,
 }: {
   filters: CatalogFilters;
-  categoryName?: string;
-  onChange: (changes: Partial<CatalogFilters>) => void;
-  onReset: () => void;
+  firstPageCount: number;
+  total: number;
 }) {
-  const chips: { key: string; label: string; clear: Partial<CatalogFilters> }[] = [];
-  if (filters.q) chips.push({ key: "q", label: `"${filters.q}"`, clear: { q: undefined } });
-  if (filters.categorySlug)
-    chips.push({
-      key: "kategori",
-      label: categoryName ?? filters.categorySlug,
-      clear: { categorySlug: undefined },
-    });
-  if (filters.condition)
-    chips.push({
-      key: "kondisi",
-      label: filters.condition === "baru" ? "Baru" : "Bekas",
-      clear: { condition: undefined },
-    });
-  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
-    const min = filters.minPrice !== undefined ? formatRupiah(filters.minPrice) : "Rp 0";
-    const max = filters.maxPrice !== undefined ? formatRupiah(filters.maxPrice) : "tanpa batas";
-    chips.push({
-      key: "harga",
-      label: `${min} sampai ${max}`,
-      clear: { minPrice: undefined, maxPrice: undefined },
-    });
-  }
-  if (chips.length === 0) return null;
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [items, setItems] = useState<ProductSummary[]>([]);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const sentinel = useRef<HTMLDivElement>(null);
+  const loaded = firstPageCount + items.length;
+  const done = loaded >= total;
+
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || done) return;
+    const observer = new IntersectionObserver(
+      async ([entry]) => {
+        if (!entry.isIntersecting || loading) return;
+        setLoading(true);
+        try {
+          const next = await queryClient.fetchQuery(
+            trpc.catalog.products.queryOptions({ ...toProductListInput(filters), page: page + 1 })
+          );
+          setItems((prev) => [...prev, ...next.items]);
+          setPage(page + 1);
+        } finally {
+          setLoading(false);
+        }
+      },
+      { rootMargin: "240px" }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [done, loading, page, filters, queryClient, trpc]);
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {chips.map((chip) => (
-        <button
-          key={chip.key}
-          type="button"
-          onClick={() => onChange(chip.clear)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100"
-        >
-          {chip.label}
-          <XIcon className="size-3.5" aria-label="Hapus filter" />
-        </button>
+    <>
+      {items.map((product) => (
+        <ProductCard key={product.id} product={product} />
       ))}
-      <button
-        type="button"
-        onClick={onReset}
-        className="text-xs font-medium text-ink-600 underline-offset-4 hover:text-ink-900 hover:underline"
-      >
-        Hapus semua
-      </button>
-    </div>
+      {done ? null : (
+        <div ref={sentinel} className="col-span-2 grid grid-cols-2 gap-2.5">
+          {loading ? (
+            <>
+              <ProductCardSkeleton />
+              <ProductCardSkeleton />
+            </>
+          ) : null}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -105,154 +132,154 @@ export function CatalogView({ filters }: { filters: CatalogFilters }) {
   );
   const { data: categories } = useSuspenseQuery(trpc.catalog.categories.queryOptions());
   const { update, reset, isPending } = useCatalogNavigation(filters);
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  const activeCategory = categories.find((c) => c.slug === filters.categorySlug);
   const filtered = hasActiveFilters(filters);
   const activeCount = [
     filters.categorySlug,
     filters.condition,
     filters.minPrice !== undefined || filters.maxPrice !== undefined ? "harga" : undefined,
+    filters.inStock ? "stok" : undefined,
   ].filter(Boolean).length;
-  const shown = list.items.length;
-  const title = activeCategory?.name ?? (filters.condition === "bekas" ? "Barang Bekas" : "Katalog Produk");
+  const sortLabel = SORT_OPTIONS.find((o) => o.value === filters.sort)?.label ?? "Terbaru";
+  const allActive = !filters.condition && !filters.categorySlug;
+  const queryKey = JSON.stringify({ ...filters, page: 1 });
 
   return (
-    <div className="flex flex-col">
-      <header className={cn(CONTAINER, "flex flex-col gap-2.5 pt-8 pb-6 lg:pt-10 lg:pb-8")}>
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[13px]">
-          <Link href="/" className="text-ink-500 hover:text-ink-900">
-            Beranda
-          </Link>
-          <ChevronRightIcon className="size-3.5 text-ink-300" />
-          <span className="font-semibold text-ink-900">Produk</span>
-        </nav>
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-          <h1 className="text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl lg:text-[44px]">
-            {title}
-          </h1>
-          <p className="text-sm text-ink-500" aria-live="polite">
-            {list.total === 0
-              ? "Tidak ada produk"
-              : `Menampilkan ${shown} dari ${list.total} produk`}
-          </p>
+    <div className="flex flex-1 flex-col">
+      <TopBar title="Katalog produk" backHref="/" />
+      <div className="flex flex-col gap-2.5 border-b border-ink-200 bg-white px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <CatalogSearch value={filters.q ?? ""} onSearch={(q) => update({ q })} className="flex-1" />
+          <button
+            type="button"
+            aria-label="Filter"
+            onClick={() => setFilterOpen(true)}
+            className="relative flex size-11 shrink-0 items-center justify-center rounded-[10px] border-[1.5px] border-brand-600 text-brand-600"
+          >
+            <SlidersHorizontalIcon className="size-[22px]" strokeWidth={2} />
+            {activeCount > 0 ? (
+              <span className="absolute -top-1.5 -right-1.5 flex size-[18px] items-center justify-center rounded-full bg-accent-yellow text-[11px] font-bold text-ink-900">
+                {activeCount}
+              </span>
+            ) : null}
+          </button>
         </div>
-      </header>
-
-      <div className={cn(CONTAINER, "flex gap-12 pb-24")}>
-        <aside className="hidden w-[260px] shrink-0 lg:block" aria-label="Filter produk">
-          <CatalogFilterPanel filters={filters} categories={categories} onChange={update} />
-        </aside>
-
-        <section className="flex min-w-0 flex-1 flex-col gap-6" aria-label="Daftar produk">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CatalogSearch
-              value={filters.q ?? ""}
-              onSearch={(q) => update({ q })}
-              className="w-full sm:max-w-[420px]"
-            />
-            <div className="flex items-center gap-2">
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="h-[42px] flex-1 border-ink-300 px-4 font-semibold lg:hidden"
-                  >
-                    <SlidersHorizontalIcon />
-                    Filter
-                    {activeCount > 0 ? (
-                      <span className="flex size-5 items-center justify-center rounded-full bg-brand-600 text-[11px] text-white">
-                        {activeCount}
-                      </span>
-                    ) : null}
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-[320px] max-w-[85vw] overflow-y-auto">
-                  <SheetHeader>
-                    <SheetTitle>Filter produk</SheetTitle>
-                    <SheetDescription>Saring berdasarkan kondisi, kategori, dan harga.</SheetDescription>
-                  </SheetHeader>
-                  <CatalogFilterPanel
-                    filters={filters}
-                    categories={categories}
-                    onChange={update}
-                    className="px-4 pb-6"
-                  />
-                </SheetContent>
-              </Sheet>
-              <Select
-                value={filters.sort}
-                onValueChange={(value) => update({ sort: value as CatalogSort })}
-              >
-                <SelectTrigger
-                  aria-label="Urutkan"
-                  className="h-[42px]! flex-1 gap-2 border-ink-300 px-3 text-[13px] sm:flex-none"
-                >
-                  <span className="text-ink-500">Urutkan:</span>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  {SORT_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <ActiveFilterChips
-            filters={filters}
-            categoryName={activeCategory?.name}
-            onChange={update}
-            onReset={reset}
-          />
-
-          {list.items.length === 0 ? (
-            <EmptyState
-              icon={SearchXIcon}
-              className="min-h-[360px] rounded-2xl"
-              title={
-                filters.q
-                  ? `Tidak ada yang cocok dengan "${filters.q}"`
-                  : filtered
-                    ? "Tidak ada produk yang cocok"
-                    : "Belum ada produk"
+        <div className="cjt-no-scrollbar flex gap-2 overflow-x-auto">
+          <FilterChip active={allActive} onClick={() => update({ condition: undefined, categorySlug: undefined })}>
+            Semua
+          </FilterChip>
+          <FilterChip
+            active={filters.condition === "baru"}
+            onClick={() => update({ condition: filters.condition === "baru" ? undefined : "baru" })}
+          >
+            Baru
+          </FilterChip>
+          <FilterChip
+            active={filters.condition === "bekas"}
+            onClick={() => update({ condition: filters.condition === "bekas" ? undefined : "bekas" })}
+          >
+            Bekas
+          </FilterChip>
+          {categories.map((category) => (
+            <FilterChip
+              key={category.id}
+              active={filters.categorySlug === category.slug}
+              onClick={() =>
+                update({ categorySlug: filters.categorySlug === category.slug ? undefined : category.slug })
               }
-              description={
-                filtered
-                  ? "Coba kata lain atau hapus beberapa filter."
-                  : "Produk akan tampil di sini setelah ditambahkan oleh toko."
-              }
-              action={
-                filtered ? (
-                  <Button variant="outline" className="h-10 border-ink-300 px-4 font-semibold" onClick={reset}>
-                    Hapus semua filter
-                  </Button>
-                ) : undefined
-              }
-            />
-          ) : (
-            <div
-              className={cn(
-                "grid grid-cols-2 gap-x-4 gap-y-8 transition-opacity sm:gap-x-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
-                isPending && "pointer-events-none opacity-60"
-              )}
-              aria-busy={isPending}
             >
-              {list.items.map((product, index) => (
-                <ProductCard key={product.id} product={product} priority={index < 5} />
-              ))}
-            </div>
-          )}
-
-          <CatalogPagination
-            page={list.page}
-            pageCount={list.pageCount}
-            hrefFor={(page) => catalogHref({ ...filters, page })}
-          />
-        </section>
+              {category.name}
+            </FilterChip>
+          ))}
+        </div>
       </div>
+
+      <div className="flex items-center gap-2 px-3 pt-2.5">
+        <p className="flex-1 text-[13px] font-medium text-ink-500" aria-live="polite">
+          {list.total} produk ditemukan
+        </p>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className="flex items-center gap-1 text-[13px] font-bold text-brand-700">
+              <ArrowDownUpIcon className="size-4" />
+              {sortLabel}
+              <ChevronDownIcon className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuRadioGroup
+              value={filters.sort}
+              onValueChange={(value) => update({ sort: value as CatalogSort })}
+            >
+              {SORT_OPTIONS.map((option) => (
+                <DropdownMenuRadioItem key={option.value} value={option.value}>
+                  {option.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {list.items.length === 0 ? (
+        <div className="flex flex-col items-center gap-2.5 px-6 py-14 text-center">
+          <span className="flex size-24 items-center justify-center rounded-full bg-brand-100">
+            <SearchIcon className="size-11 text-brand-600" strokeWidth={1.6} />
+          </span>
+          <h2 className="text-lg font-bold text-ink-900">
+            {filtered ? "Produk tidak ditemukan" : "Belum ada produk"}
+          </h2>
+          <p className="max-w-[290px] text-sm text-ink-500">
+            {filtered
+              ? emptyDescription(filters)
+              : "Produk akan tampil di sini setelah ditambahkan oleh toko."}
+          </p>
+          {filtered ? (
+            <div className="mt-1.5 flex flex-col items-center gap-2.5">
+              <MButton size="sm" className="h-[46px] px-6" onClick={reset}>
+                <RefreshCwIcon className="size-[18px]" />
+                Reset filter
+              </MButton>
+              <MButton
+                variant="secondary"
+                className="h-[46px] px-6"
+                onClick={() => update({ q: undefined, condition: undefined, categorySlug: undefined })}
+              >
+                Lihat semua produk
+              </MButton>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "grid grid-cols-2 gap-2.5 px-3 py-2.5 transition-opacity",
+            isPending && "pointer-events-none opacity-60",
+          )}
+          aria-busy={isPending}
+        >
+          {list.items.map((product, index) => (
+            <ProductCard key={product.id} product={product} priority={index < 4} />
+          ))}
+          {list.total > CATALOG_PAGE_SIZE ? (
+            <MoreProducts
+              key={queryKey}
+              filters={filters}
+              firstPageCount={list.items.length}
+              total={list.total}
+            />
+          ) : null}
+        </div>
+      )}
+
+      <CatalogFilterSheet
+        open={filterOpen}
+        onOpenChange={setFilterOpen}
+        filters={filters}
+        categories={categories}
+        onApply={(draft) => update(draft)}
+      />
     </div>
   );
 }

@@ -1,428 +1,426 @@
 "use client";
 
 import {
-  AlertCircle,
-  ArrowLeft,
-  CheckCircle2,
-  Copy,
-  Hourglass,
-  Store,
-  WifiOff,
+  CheckIcon,
+  ClockIcon,
+  PhoneIcon,
+  TriangleAlertIcon,
+  UploadIcon,
+  WifiOffIcon,
+  XIcon,
 } from "lucide-react";
-import Link from "next/link";
-import { useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+import { MButton, MLink } from "@/components/mobile/m-button";
+import { BottomSheet, SheetClose, SheetRoot } from "@/components/mobile/sheet";
+import { StickyBar } from "@/components/mobile/sticky-bar";
+import { BackButton } from "@/components/mobile/top-bar";
+import { EmptyState } from "@/components/shared";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProductThumb } from "@/features/cart";
 import { formatDateTime, formatRupiah } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { useTRPC } from "@/trpc/client";
 import { canCancel, canUploadProof } from "../constants";
-import {
-  useCancelOrder,
-  useOrder,
-  useStoreSettings,
-} from "../hooks/use-orders";
-import type { OrderDetail as Order } from "../types";
-import { OrderStatusBadge } from "@/components/shared";
-import { OrderTimeline } from "./order-timeline";
-import { PaymentCountdown } from "./payment-countdown";
-import { PaymentProofUpload } from "./payment-proof-upload";
+import { useCancelOrder, useOrder } from "../hooks/use-orders";
+import type { OrderDetail as Order, OrderStatus } from "../types";
+
+type Step = { key: string; label: string; note?: string; state: "done" | "current" | "upcoming" | "failed" };
+
+const FLOW: OrderStatus[] = ["menunggu_pembayaran", "menunggu_konfirmasi", "dibayar", "diproses", "selesai"];
+
+function lastLogAt(order: Order, status: OrderStatus) {
+  return order.statusLogs.filter((l) => l.toStatus === status).at(-1)?.createdAt;
+}
+
+function buildSteps(order: Order, rejected: Order["payments"][number] | undefined): Step[] {
+  const transfer = order.paymentMethod === "transfer";
+  const steps: Step[] = [
+    { key: "dibuat", label: "Pesanan dibuat", note: formatDateTime(order.createdAt), state: "done" },
+  ];
+
+  if (order.status === "dibatalkan") {
+    for (const s of ["menunggu_konfirmasi", "dibayar", "diproses"] as const) {
+      if (s === "menunggu_konfirmasi" && !transfer) continue;
+      const at = lastLogAt(order, s);
+      if (at) {
+        steps.push({
+          key: s,
+          label: s === "menunggu_konfirmasi" ? "Bukti diunggah" : s === "dibayar" ? "Dibayar" : "Diproses",
+          note: formatDateTime(at),
+          state: "done",
+        });
+      }
+    }
+    steps.push({
+      key: "dibatalkan",
+      label: "Dibatalkan",
+      note: formatDateTime(lastLogAt(order, "dibatalkan") ?? order.createdAt),
+      state: "failed",
+    });
+    return steps;
+  }
+
+  const idx = FLOW.indexOf(order.status);
+  if (transfer) {
+    if (rejected) {
+      steps.push({
+        key: "ditolak",
+        label: "Bukti ditolak",
+        note: formatDateTime(rejected.confirmedAt ?? rejected.createdAt),
+        state: "failed",
+      });
+      steps.push({ key: "ulang", label: "Unggah ulang bukti", note: "Menunggu kamu", state: "current" });
+    } else if (idx >= 1) {
+      steps.push({
+        key: "bukti",
+        label: "Bukti diunggah",
+        note: formatDateTime(lastLogAt(order, "menunggu_konfirmasi") ?? order.createdAt),
+        state: "done",
+      });
+      steps.push({
+        key: "konfirmasi",
+        label: "Menunggu konfirmasi Owner",
+        note: idx === 1 ? "Sedang dicek" : undefined,
+        state: idx === 1 ? "current" : "done",
+      });
+    } else {
+      steps.push({ key: "bayar", label: "Menunggu pembayaran", note: "Unggah bukti transfer", state: "current" });
+    }
+  } else if (idx === 0) {
+    steps.push({ key: "bayar", label: "Menunggu pembayaran", note: "Bayar tunai saat serah terima", state: "current" });
+  }
+
+  for (const [key, label, at] of [
+    ["dibayar", "Dibayar", FLOW.indexOf("dibayar")],
+    ["diproses", "Diproses", FLOW.indexOf("diproses")],
+    ["selesai", "Selesai", FLOW.indexOf("selesai")],
+  ] as const) {
+    const done = idx >= at;
+    const current = idx === at && key !== "selesai";
+    const when = lastLogAt(order, key as OrderStatus);
+    steps.push({
+      key,
+      label,
+      note: done && when ? formatDateTime(when) : undefined,
+      state: key === "selesai" && done ? "done" : current ? "current" : done ? "done" : "upcoming",
+    });
+  }
+  return steps;
+}
+
+function Timeline({ steps }: { steps: Step[] }) {
+  return (
+    <ol className="flex flex-col pt-1.5">
+      {steps.map((step, i) => {
+        const last = i === steps.length - 1;
+        const dot =
+          step.state === "done"
+            ? "bg-success"
+            : step.state === "failed"
+              ? "bg-error"
+              : step.state === "current"
+                ? "bg-brand-600 shadow-[0_0_0_5px_var(--color-brand-100)]"
+                : "bg-ink-300";
+        return (
+          <li key={step.key} className="relative flex gap-3 pb-4 last:pb-0">
+            <span className={cn("z-10 flex size-6 shrink-0 items-center justify-center rounded-full", dot)}>
+              {step.state === "done" ? <CheckIcon className="size-4 text-white" strokeWidth={3} /> : null}
+              {step.state === "failed" ? <XIcon className="size-4 text-white" strokeWidth={3} /> : null}
+              {step.state === "current" ? <span className="size-2 rounded-full bg-white" /> : null}
+            </span>
+            {last ? null : (
+              <span
+                aria-hidden
+                className={cn(
+                  "absolute top-[26px] -bottom-1 left-[11px] w-0.5",
+                  step.state === "done" ? "bg-success" : "bg-[#DCE3EA]",
+                )}
+              />
+            )}
+            <div className="flex flex-col gap-0.5">
+              <p className={cn("text-sm font-bold", step.state === "upcoming" ? "text-ink-500" : "text-ink-900")}>
+                {step.label}
+              </p>
+              {step.note ? <p className="text-xs text-ink-500">{step.note}</p> : <p className="h-4" />}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function Banner({ order, rejected }: { order: Order; rejected: Order["payments"][number] | undefined }) {
+  const note = rejected?.ownerNote?.trim();
+  const config = rejected
+    ? {
+        tone: "border-error-border bg-error-soft",
+        title: "Bukti ditolak",
+        titleTone: "text-error",
+        icon: <TriangleAlertIcon className="size-5 shrink-0 text-error" strokeWidth={2} />,
+        body: `Bukti transfer ditolak.${note ? ` Catatan Owner: "${note}"` : ""} Unggah ulang bukti yang benar.`,
+      }
+    : order.status === "menunggu_konfirmasi"
+      ? {
+          tone: "border-info-border bg-info-soft",
+          title: "Menunggu konfirmasi",
+          titleTone: "text-brand-700",
+          icon: <ClockIcon className="size-5 shrink-0 text-brand-700" strokeWidth={2} />,
+          body: "Buktimu sudah terkirim. Owner akan mengecek dan mengonfirmasi pembayaran.",
+        }
+      : order.status === "menunggu_pembayaran"
+        ? {
+            tone: "border-warning-border bg-warning-soft",
+            title: "Menunggu pembayaran",
+            titleTone: "text-warning",
+            icon: <ClockIcon className="size-5 shrink-0 text-warning" strokeWidth={2} />,
+            body:
+              order.paymentMethod === "transfer" && order.expiresAt
+                ? `Unggah bukti transfer sebelum ${formatDateTime(order.expiresAt)} atau pesanan otomatis dibatalkan.`
+                : "Bayar tunai saat serah terima barang.",
+          }
+        : order.status === "dibatalkan"
+          ? {
+              tone: "border-error-border bg-error-soft",
+              title: "Pesanan dibatalkan",
+              titleTone: "text-error",
+              icon: <XIcon className="size-5 shrink-0 text-error" strokeWidth={2} />,
+              body: "Pesanan ini dibatalkan dan stok sudah dilepas.",
+            }
+          : {
+              tone: "border-success-border bg-success-soft",
+              title:
+                order.status === "dibayar"
+                  ? "Pembayaran dikonfirmasi"
+                  : order.status === "diproses"
+                    ? "Pesanan diproses"
+                    : "Pesanan selesai",
+              titleTone: "text-success",
+              icon: <CheckIcon className="size-5 shrink-0 text-success" strokeWidth={2.4} />,
+              body:
+                order.status === "selesai"
+                  ? "Terima kasih sudah berbelanja di Cadas Jaya Teknik."
+                  : "Owner sedang menyiapkan pesananmu.",
+            };
+  return (
+    <div className={cn("flex gap-2.5 rounded-[10px] border p-3", config.tone)}>
+      {config.icon}
+      <div className="flex flex-col gap-0.5">
+        <p className={cn("text-sm font-bold", config.titleTone)}>{config.title}</p>
+        <p className="text-[13px] text-ink-900">{config.body}</p>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      <p className="flex-1 text-sm text-ink-500">{label}</p>
+      <div className="text-sm font-medium text-ink-900">{children}</div>
+    </div>
+  );
+}
+
+function Header({ code }: { code?: string }) {
+  return (
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-0.5 border-b border-ink-200 bg-white px-1">
+      <BackButton href="/pesanan" />
+      <h1 className="flex-1 text-[17px] font-bold text-ink-900">Detail pesanan</h1>
+      {code ? (
+        <span className="mr-3 rounded-md bg-toast px-2 py-[3px] text-[11px] font-bold text-white">{code}</span>
+      ) : null}
+    </header>
+  );
+}
 
 export function OrderDetail({ code }: { code: string }) {
-  const { data: order, isPending, isError, error, refetch, isRefetching } =
-    useOrder(code);
-  const onExpire = useCallback(() => void refetch(), [refetch]);
+  const { data: order, isPending, isError, error, refetch } = useOrder(code);
+  const trpc = useTRPC();
+  const { data: settings } = useQuery(trpc.settings.get.queryOptions());
+  const cancel = useCancelOrder();
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [proofOpen, setProofOpen] = useState(false);
 
-  if (isPending) return <OrderDetailSkeleton />;
+  if (isPending) {
+    return (
+      <div className="flex flex-1 flex-col">
+        <Header />
+        <div role="status" className="flex flex-col gap-1.5">
+          <Skeleton className="h-24 rounded-none" />
+          <Skeleton className="h-64 rounded-none" />
+          <Skeleton className="h-40 rounded-none" />
+        </div>
+      </div>
+    );
+  }
 
   if (isError) {
     const notFound = error.data?.code === "NOT_FOUND";
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6">
-        <Empty className="border border-border">
-          <EmptyHeader>
-            {notFound ? (
-              <p className="font-heading text-7xl font-bold text-brand-600">404</p>
+      <div className="flex flex-1 flex-col">
+        <Header />
+        <EmptyState
+          icon={notFound ? TriangleAlertIcon : WifiOffIcon}
+          title={notFound ? "Pesanan tidak ditemukan" : "Koneksi terputus"}
+          description={
+            notFound
+              ? "Pesanan ini tidak ada atau bukan milik akunmu."
+              : "Detail pesanan belum bisa dimuat. Periksa internet lalu coba lagi."
+          }
+          action={
+            notFound ? (
+              <MLink href="/pesanan" className="h-[46px] px-6">
+                Lihat pesanan saya
+              </MLink>
             ) : (
-              <EmptyMedia variant="icon">
-                <WifiOff />
-              </EmptyMedia>
-            )}
-            <EmptyTitle>
-              {notFound ? "Pesanan tidak ditemukan" : "Gagal memuat pesanan"}
-            </EmptyTitle>
-            <EmptyDescription>
-              {notFound
-                ? `Tidak ada pesanan dengan kode ${code} di akunmu.`
-                : "Detail pesanan belum bisa dimuat. Periksa internet lalu coba lagi."}
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent className="flex-row justify-center">
-            {!notFound && (
-              <Button onClick={() => refetch()} disabled={isRefetching}>
-                {isRefetching ? "Memuat..." : "Coba lagi"}
-              </Button>
-            )}
-            <Button variant="outline" asChild>
-              <Link href="/pesanan">Kembali ke pesanan saya</Link>
-            </Button>
-          </EmptyContent>
-        </Empty>
+              <MButton className="px-7" onClick={() => refetch()}>
+                Coba lagi
+              </MButton>
+            )
+          }
+        />
       </div>
     );
   }
 
-  const showCountdown =
-    canUploadProof(order) && order.expiresAt !== null;
-
-  return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 md:py-10">
-      <Link
-        href="/pesanan"
-        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-600 hover:text-ink-900"
-      >
-        <ArrowLeft className="size-4" />
-        Pesanan saya
-      </Link>
-
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-heading text-2xl font-bold text-ink-900 sm:text-4xl">
-            {order.code}
-          </h1>
-          <OrderStatusBadge status={order.status} />
-        </div>
-        <p className="text-sm text-ink-500">Dibuat {formatDateTime(order.createdAt)}</p>
-      </div>
-
-      {showCountdown && order.expiresAt && (
-        <div className="mt-5">
-          <PaymentCountdown expiresAt={order.expiresAt} onExpire={onExpire} />
-        </div>
-      )}
-
-      <div className="mt-8 grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)_340px] lg:gap-10">
-        <OrderTimeline order={order} />
-        <PaymentSection order={order} />
-        <OrderSummary order={order} />
-      </div>
-    </div>
-  );
-}
-
-function PaymentSection({ order }: { order: Order }) {
-  const latestPayment = order.payments[0];
+  const latest = order.payments[0];
   const rejected =
-    order.status === "menunggu_pembayaran" && latestPayment?.status === "ditolak"
-      ? latestPayment
-      : null;
+    order.status === "menunggu_pembayaran" && latest?.status === "ditolak" ? latest : undefined;
+  const proof = order.payments.find((p) => p.proofUrl)?.proofUrl ?? null;
+  const steps = buildSteps(order, rejected);
+  const phone = settings?.phone.trim();
+  const contact = phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : "/kontak";
 
-  if (order.paymentMethod === "tunai") {
-    return (
-      <section className="min-w-0">
-        <h2 className="text-[22px] font-semibold text-ink-900">Pembayaran tunai</h2>
-        <InfoBox icon={<Store className="size-5" />}>
-          {order.status === "menunggu_pembayaran"
-            ? order.fulfillment === "ambil"
-              ? "Bayar tunai di toko saat mengambil pesanan. Tunjukkan kode pesanan ini ke kasir."
-              : "Bayar tunai kepada kurir saat pesanan diterima."
-            : order.status === "dibatalkan"
-              ? "Pesanan ini sudah dibatalkan."
-              : "Pembayaran tunai sudah diterima toko."}
-        </InfoBox>
+  return (
+    <div className="flex flex-1 flex-col pb-[76px]">
+      <Header code={order.code} />
+      <section className="bg-white p-3">
+        <Banner order={order} rejected={rejected} />
       </section>
-    );
-  }
-
-  if (canUploadProof(order)) {
-    return (
-      <section className="flex min-w-0 flex-col gap-4">
-        <h2 className="text-[22px] font-semibold text-ink-900">Upload bukti transfer</h2>
-        {rejected && (
-          <div
-            role="alert"
-            className="flex gap-3 rounded-xl border border-error-border bg-error-soft px-4 py-3"
-          >
-            <AlertCircle className="mt-0.5 size-4 shrink-0 text-error" />
-            <div>
-              <p className="text-sm font-bold text-error">Bukti sebelumnya ditolak</p>
-              {rejected.ownerNote && (
-                <p className="mt-0.5 text-[13px] text-ink-800">
-                  Catatan Owner: {rejected.ownerNote}
-                </p>
-              )}
+      <div className="h-1.5" />
+      <section className="flex flex-col gap-1.5 bg-white p-3">
+        <h2 className="text-[15px] font-bold text-ink-900">Riwayat status</h2>
+        <Timeline steps={steps} />
+      </section>
+      <div className="h-1.5" />
+      <section className="flex flex-col gap-2.5 bg-white p-3">
+        <h2 className="text-[15px] font-bold text-ink-900">Produk</h2>
+        {order.items.map((item) => (
+          <div key={item.id} className="flex items-center gap-2.5">
+            <ProductThumb src={item.image} alt="" className="size-14" />
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <p className="line-clamp-2 text-[13px] font-medium text-ink-900">{item.productName}</p>
+              <p className="text-xs text-ink-500">
+                {formatRupiah(item.unitPrice)} · x{item.quantity}
+              </p>
             </div>
+            <p className="text-sm font-bold text-ink-900">{formatRupiah(item.unitPrice * item.quantity)}</p>
           </div>
-        )}
-        <BankAccounts total={order.total} />
-        <PaymentProofUpload code={order.code} />
+        ))}
       </section>
-    );
-  }
-
-  const accepted = order.payments.find((p) => p.status === "diterima");
-  const waiting = order.status === "menunggu_konfirmasi" ? latestPayment : null;
-  const proof = waiting ?? accepted;
-
-  return (
-    <section className="flex min-w-0 flex-col gap-4">
-      <h2 className="text-[22px] font-semibold text-ink-900">Bukti transfer</h2>
-      {order.status === "menunggu_konfirmasi" ? (
-        <InfoBox icon={<Hourglass className="size-5" />} tone="info">
-          Bukti transfer sudah dikirim dan sedang diperiksa Owner. Status pesanan
-          akan berubah setelah pembayaran dikonfirmasi.
-        </InfoBox>
-      ) : order.status === "dibatalkan" ? (
-        <InfoBox icon={<AlertCircle className="size-5" />} tone="error">
-          Pesanan ini sudah dibatalkan.
-        </InfoBox>
-      ) : (
-        <InfoBox icon={<CheckCircle2 className="size-5" />} tone="success">
-          Pembayaran sudah dikonfirmasi Owner.
-        </InfoBox>
-      )}
-      {proof?.proofUrl && (
-        <a
-          href={proof.proofUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="block overflow-hidden rounded-xl border border-border bg-ink-50"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={proof.proofUrl}
-            alt={`Bukti transfer pesanan ${order.code}`}
-            className="max-h-96 w-full object-contain"
-          />
-          <span className="block border-t border-border px-4 py-2 text-xs text-ink-500">
-            Diunggah {formatDateTime(proof.createdAt)}
-          </span>
-        </a>
-      )}
-    </section>
-  );
-}
-
-function InfoBox({
-  icon,
-  tone = "neutral",
-  children,
-}: {
-  icon: React.ReactNode;
-  tone?: "neutral" | "info" | "success" | "error";
-  children: React.ReactNode;
-}) {
-  const toneClass = {
-    neutral: "border-border bg-ink-50 text-ink-700",
-    info: "border-info-border bg-info-soft text-info",
-    success: "border-success-border bg-success-soft text-success",
-    error: "border-error-border bg-error-soft text-error",
-  }[tone];
-  return (
-    <div className={`mt-4 flex gap-3 rounded-xl border px-4 py-4 first:mt-0 ${toneClass}`}>
-      <span className="shrink-0">{icon}</span>
-      <p className="text-sm text-ink-800">{children}</p>
-    </div>
-  );
-}
-
-function BankAccounts({ total }: { total: number }) {
-  const { data, isPending, isError } = useStoreSettings();
-
-  if (isPending) return <Skeleton className="h-20 w-full rounded-xl" />;
-  if (isError || data.bankAccounts.length === 0) {
-    return (
-      <InfoBox icon={<AlertCircle className="size-5" />}>
-        Info rekening belum tersedia. Hubungi toko untuk nomor rekening tujuan.
-      </InfoBox>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      {data.bankAccounts.map((acc) => (
-        <div
-          key={`${acc.bank}-${acc.number}`}
-          className="flex flex-wrap items-center gap-4 rounded-xl bg-ink-50 px-4 py-4 sm:px-5"
-        >
-          <span className="flex h-9 min-w-12 items-center justify-center rounded-lg bg-info px-2 text-[13px] font-extrabold text-white">
-            {acc.bank}
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="text-lg font-semibold text-ink-900 tabular-nums">
-                {acc.number}
-              </span>
-              <Button
+      <div className="h-1.5" />
+      <section className="flex flex-col gap-2.5 bg-white p-3">
+        <h2 className="text-[15px] font-bold text-ink-900">Pembayaran</h2>
+        <Row label="Metode">{order.paymentMethod === "transfer" ? "Transfer bank" : "Tunai"}</Row>
+        <Row label="Pengambilan">{order.fulfillment === "ambil" ? "Ambil di toko" : "Dikirim"}</Row>
+        {order.fulfillment === "kirim" && order.address ? (
+          <Row label="Alamat">
+            <span className="block max-w-[200px] text-right">{order.address}</span>
+          </Row>
+        ) : null}
+        <Row label="Total">
+          <span className="text-base font-bold text-brand-700">{formatRupiah(order.total)}</span>
+        </Row>
+        {order.paymentMethod === "transfer" ? (
+          <Row label="Bukti transfer">
+            {proof ? (
+              <button
                 type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label={`Salin nomor rekening ${acc.bank}`}
+                aria-label="Lihat bukti transfer"
+                onClick={() => setProofOpen(true)}
+                className="size-11 overflow-hidden rounded-lg bg-toast"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={proof} alt="" className="size-full object-cover" />
+              </button>
+            ) : (
+              <span className="text-ink-500">Belum ada</span>
+            )}
+          </Row>
+        ) : null}
+      </section>
+
+      <StickyBar>
+        {rejected || canUploadProof(order) ? (
+          <MLink href={`/pesanan/${order.code}/bayar`} size="lg" block>
+            <UploadIcon className="size-[18px]" />
+            {rejected ? "Unggah ulang bukti" : "Bayar sekarang"}
+          </MLink>
+        ) : (
+          <a href={contact} className="flex h-[50px] flex-1 items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-brand-600 bg-white text-[15px] font-bold text-brand-700">
+            <PhoneIcon className="size-[18px]" />
+            Hubungi toko
+          </a>
+        )}
+        {canCancel(order) && !rejected ? (
+          <MButton variant="dangerOutline" size="lg" className="flex-1" onClick={() => setCancelOpen(true)}>
+            Batalkan pesanan
+          </MButton>
+        ) : null}
+      </StickyBar>
+
+      <SheetRoot open={cancelOpen} onOpenChange={setCancelOpen}>
+        <BottomSheet title="Batalkan pesanan">
+          <div className="flex flex-col gap-3 px-4 pt-2 pb-5">
+            <p className="text-[17px] font-bold text-ink-900">Batalkan pesanan?</p>
+            <p className="text-sm text-ink-500">
+              Pesanan {order.code} akan dibatalkan dan stok dilepas. Tindakan ini tidak bisa dibatalkan.
+            </p>
+            <div className="flex gap-2.5">
+              <MButton variant="outline" className="flex-1" onClick={() => setCancelOpen(false)}>
+                Kembali
+              </MButton>
+              <MButton
+                variant="danger"
+                className="flex-1"
+                loading={cancel.isPending}
                 onClick={() =>
-                  navigator.clipboard
-                    .writeText(acc.number.replace(/\s/g, ""))
-                    .then(() => toast.success("Nomor rekening disalin"))
-                    .catch(() => toast.error("Gagal menyalin nomor rekening"))
+                  cancel.mutate(
+                    { code: order.code },
+                    {
+                      onSuccess: () => {
+                        toast.success("Pesanan dibatalkan");
+                        setCancelOpen(false);
+                      },
+                      onError: (e) => toast.error(e.message),
+                    },
+                  )
                 }
               >
-                <Copy />
-              </Button>
+                Batalkan pesanan
+              </MButton>
             </div>
-            <p className="text-[13px] text-ink-600">a.n. {acc.holder}</p>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-ink-500">Jumlah transfer</p>
-            <p className="text-xl font-bold text-brand-700">{formatRupiah(total)}</p>
+        </BottomSheet>
+      </SheetRoot>
+
+      <SheetRoot open={proofOpen} onOpenChange={setProofOpen}>
+        <BottomSheet title="Bukti transfer">
+          <div className="flex h-12 items-center gap-1 pr-2 pl-4">
+            <p className="flex-1 text-[17px] font-bold text-ink-900">Bukti transfer</p>
+            <SheetClose aria-label="Tutup" className="flex size-10 items-center justify-center rounded-full text-ink-500">
+              <XIcon className="size-6" strokeWidth={1.8} />
+            </SheetClose>
           </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function OrderSummary({ order }: { order: Order }) {
-  return (
-    <aside className="flex min-w-0 flex-col">
-      <SummaryBlock title="Barang">
-        <ul className="flex flex-col gap-3">
-          {order.items.map((item) => (
-            <li key={item.id} className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[13px] font-semibold text-ink-900">{item.productName}</p>
-                <p className="text-xs text-ink-500">
-                  {item.quantity} x {formatRupiah(item.unitPrice)}
-                </p>
-              </div>
-              <span className="text-[13px] font-semibold whitespace-nowrap text-ink-900">
-                {formatRupiah(item.unitPrice * item.quantity)}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-          <span className="text-sm font-semibold text-ink-900">Total</span>
-          <span className="text-lg font-bold text-ink-900">{formatRupiah(order.total)}</span>
-        </div>
-      </SummaryBlock>
-
-      <SummaryBlock title={order.fulfillment === "kirim" ? "Pengiriman" : "Ambil di toko"}>
-        <p className="text-sm font-semibold text-ink-900">
-          {order.recipientName}, {order.phone}
-        </p>
-        <p className="mt-1 text-sm text-ink-600">
-          {order.fulfillment === "kirim"
-            ? order.address
-            : "Pesanan diambil langsung di toko Cadas Jaya Teknik."}
-        </p>
-      </SummaryBlock>
-
-      <SummaryBlock title="Pembayaran">
-        <p className="text-sm font-semibold text-ink-900">
-          {order.paymentMethod === "transfer" ? "Transfer bank" : "Tunai"}
-        </p>
-      </SummaryBlock>
-
-      {canCancel(order) && <CancelOrderButton code={order.code} />}
-    </aside>
-  );
-}
-
-function SummaryBlock({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="border-b border-border py-5 first:pt-0">
-      <h2 className="mb-3 font-sans text-[13px] font-semibold text-ink-500">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function CancelOrderButton({ code }: { code: string }) {
-  const cancel = useCancelOrder();
-
-  return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button
-          variant="ghost"
-          className="mt-4 w-fit px-0 text-sm font-semibold text-error hover:bg-transparent hover:text-error/80"
-          disabled={cancel.isPending}
-        >
-          <AlertCircle /> Batalkan pesanan
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Batalkan pesanan {code}?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Stok barang akan dilepas dan pesanan tidak bisa dilanjutkan lagi.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Tidak jadi</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            onClick={() =>
-              cancel.mutate(
-                { code },
-                {
-                  onSuccess: () => toast.success("Pesanan dibatalkan"),
-                  onError: (err) => toast.error(err.message),
-                }
-              )
-            }
-          >
-            Ya, batalkan
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-function OrderDetailSkeleton() {
-  return (
-    <div
-      className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 md:py-10"
-      aria-busy="true"
-      aria-label="Memuat pesanan"
-    >
-      <Skeleton className="h-4 w-28" />
-      <Skeleton className="mt-4 h-9 w-64" />
-      <Skeleton className="mt-5 h-14 w-full rounded-xl" />
-      <div className="mt-8 grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)_340px] lg:gap-10">
-        <div className="space-y-5">
-          {Array.from({ length: 5 }, (_, i) => (
-            <Skeleton key={i} className="h-8 w-40" />
-          ))}
-        </div>
-        <div className="space-y-4">
-          <Skeleton className="h-7 w-56" />
-          <Skeleton className="h-20 w-full rounded-xl" />
-          <Skeleton className="h-48 w-full rounded-2xl" />
-        </div>
-        <div className="space-y-4">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-20 w-full" />
-        </div>
-      </div>
+          <div className="overflow-auto px-4 pb-5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {proof ? <img src={proof} alt="Bukti transfer" className="w-full rounded-xl" /> : null}
+          </div>
+        </BottomSheet>
+      </SheetRoot>
     </div>
   );
 }

@@ -1,18 +1,14 @@
-import type { Metadata } from "next";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Roboto } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TRPCReactProvider } from "@/trpc/client";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const roboto = Roboto({
+  variable: "--font-roboto",
   subsets: ["latin"],
-});
-
-const plusJakarta = Plus_Jakarta_Sans({
-  variable: "--font-plus-jakarta",
-  subsets: ["latin"],
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -20,15 +16,22 @@ export const metadata: Metadata = {
   description: "Toko alat teknik: katalog produk dan pemesanan online",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0A4F86",
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="id"
-      className={`${inter.variable} ${plusJakarta.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
+    <html lang="id" className={`${roboto.variable} h-full antialiased`}>
+      <body className="min-h-full">
         <TRPCReactProvider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <TooltipProvider>
+            <div className="relative mx-auto flex min-h-svh w-full max-w-[430px] flex-col bg-ink-50 shadow-[0_0_40px_rgba(10,40,70,.12)]">
+              {children}
+            </div>
+          </TooltipProvider>
           <Toaster />
         </TRPCReactProvider>
       </body>

@@ -1,13 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 import { InboxIcon } from "lucide-react";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
 
 type EmptyStateProps = {
@@ -26,17 +18,15 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
-    <Empty className={cn("border border-ink-200 bg-white py-12", className)}>
-      <EmptyHeader>
-        <EmptyMedia className="size-14 rounded-full bg-ink-100 text-ink-500">
-          <Icon className="size-6" />
-        </EmptyMedia>
-        <EmptyTitle className="text-base font-semibold text-ink-900">{title}</EmptyTitle>
-        {description ? (
-          <EmptyDescription className="text-ink-500">{description}</EmptyDescription>
-        ) : null}
-      </EmptyHeader>
-      {action ? <EmptyContent>{action}</EmptyContent> : null}
-    </Empty>
+    <div className={cn("flex flex-col items-center gap-2.5 px-6 py-14 text-center", className)}>
+      <span className="flex size-24 items-center justify-center rounded-full bg-brand-100">
+        <Icon className="size-11 text-brand-600" strokeWidth={1.6} />
+      </span>
+      <h2 className="text-lg leading-[1.35] font-bold text-ink-900">{title}</h2>
+      {description ? (
+        <p className="max-w-[290px] text-sm leading-[1.35] text-ink-500">{description}</p>
+      ) : null}
+      {action ? <div className="mt-1.5 flex flex-col items-center gap-2.5">{action}</div> : null}
+    </div>
   );
 }

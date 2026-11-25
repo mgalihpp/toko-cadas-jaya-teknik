@@ -8,7 +8,7 @@ export const getCategories = cache(async () => (await caller()).catalog.categori
 export const getLatestProducts = cache(async () => (await caller()).catalog.home());
 
 export const getUsedPicks = cache(async () =>
-  (await caller()).catalog.products({ condition: "bekas", pageSize: 3 })
+  (await caller()).catalog.products({ condition: "bekas", pageSize: 6 })
 );
 
 export const getStoreSettings = cache(async () => (await caller()).settings.get());

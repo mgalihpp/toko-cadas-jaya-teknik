@@ -1,3 +1,4 @@
+import { CheckIcon, ClockIcon, PackageIcon, XIcon, type LucideIcon } from "lucide-react";
 import type { ORDER_STATUSES } from "@/server/db/schema/shared";
 import { cn } from "@/lib/utils";
 
@@ -12,13 +13,13 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   dibatalkan: "Dibatalkan",
 };
 
-const STATUS_CLASS: Record<OrderStatus, string> = {
-  menunggu_pembayaran: "border-warning-border bg-warning-soft text-warning",
-  menunggu_konfirmasi: "border-info-border bg-info-soft text-info",
-  dibayar: "border-success-border bg-success-soft text-success",
-  diproses: "border-info-border bg-info-soft text-info",
-  selesai: "border-ink-200 bg-ink-100 text-ink-600",
-  dibatalkan: "border-error-border bg-error-soft text-error",
+const STATUS_STYLE: Record<OrderStatus, { className: string; icon: LucideIcon }> = {
+  menunggu_pembayaran: { className: "bg-warning-soft text-warning", icon: ClockIcon },
+  menunggu_konfirmasi: { className: "bg-warning-soft text-warning", icon: ClockIcon },
+  dibayar: { className: "bg-success-soft text-success", icon: CheckIcon },
+  diproses: { className: "bg-brand-100 text-brand-700", icon: PackageIcon },
+  selesai: { className: "bg-success-soft text-success", icon: CheckIcon },
+  dibatalkan: { className: "bg-error-soft text-error", icon: XIcon },
 };
 
 export function OrderStatusBadge({
@@ -28,15 +29,16 @@ export function OrderStatusBadge({
   status: OrderStatus;
   className?: string;
 }) {
+  const { className: tone, icon: Icon } = STATUS_STYLE[status];
   return (
     <span
       className={cn(
-        "inline-flex h-6 w-fit items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold whitespace-nowrap",
-        STATUS_CLASS[status],
-        className
+        "inline-flex w-fit items-center gap-1 rounded-md px-2 py-[3px] text-[11px] leading-[1.2] font-bold whitespace-nowrap",
+        tone,
+        className,
       )}
     >
-      <span className="size-1.5 rounded-full bg-current" aria-hidden />
+      <Icon className="size-3" strokeWidth={2.2} aria-hidden />
       {ORDER_STATUS_LABEL[status]}
     </span>
   );

@@ -8,7 +8,7 @@ export const SORT_OPTIONS = [
 
 export type CatalogSort = (typeof SORT_OPTIONS)[number]["value"];
 
-export const CATALOG_PAGE_SIZE = 20;
+export const CATALOG_PAGE_SIZE = 12;
 
 export type CatalogFilters = {
   q?: string;
@@ -16,6 +16,7 @@ export type CatalogFilters = {
   condition?: "baru" | "bekas";
   minPrice?: number;
   maxPrice?: number;
+  inStock?: boolean;
   sort: CatalogSort;
   page: number;
 };
@@ -37,6 +38,7 @@ const searchParamsSchema = z.object({
   kondisi: z.preprocess(first, z.enum(["baru", "bekas"]).optional().catch(undefined)),
   min: price,
   max: price,
+  tersedia: z.preprocess(first, z.enum(["1"]).optional().catch(undefined)),
   urut: z.preprocess(
     first,
     z.enum(["terbaru", "termurah", "termahal"]).catch("terbaru")
@@ -61,6 +63,7 @@ export function parseCatalogSearchParams(params: RawSearchParams): CatalogFilter
     condition: p.kondisi,
     minPrice: p.min,
     maxPrice: p.max,
+    inStock: p.tersedia === "1" ? true : undefined,
     sort: p.urut,
     page: p.hal,
   };
@@ -73,6 +76,7 @@ export function catalogHref(filters: Partial<CatalogFilters>): string {
   if (filters.condition) sp.set("kondisi", filters.condition);
   if (filters.minPrice !== undefined) sp.set("min", String(filters.minPrice));
   if (filters.maxPrice !== undefined) sp.set("max", String(filters.maxPrice));
+  if (filters.inStock) sp.set("tersedia", "1");
   if (filters.sort && filters.sort !== "terbaru") sp.set("urut", filters.sort);
   if (filters.page && filters.page > 1) sp.set("hal", String(filters.page));
   const query = sp.toString();
@@ -85,7 +89,8 @@ export function hasActiveFilters(filters: CatalogFilters): boolean {
       filters.categorySlug ||
       filters.condition ||
       filters.minPrice !== undefined ||
-      filters.maxPrice !== undefined
+      filters.maxPrice !== undefined ||
+      filters.inStock
   );
 }
 

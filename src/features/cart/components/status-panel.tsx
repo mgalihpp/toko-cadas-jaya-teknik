@@ -17,23 +17,18 @@ export function StatusPanel({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-surface px-6 py-14 text-center",
-        className
-      )}
-    >
-      <div
+    <div className={cn("flex flex-col items-center gap-2.5 px-6 py-14 text-center", className)}>
+      <span
         className={cn(
-          "mb-1 flex size-14 items-center justify-center rounded-full",
-          tone === "error" ? "bg-error-soft text-error" : "bg-brand-50 text-brand-600"
+          "flex size-24 items-center justify-center rounded-full",
+          tone === "error" ? "bg-error-soft text-error" : "bg-brand-100 text-brand-600",
         )}
       >
-        <Icon className="size-6" />
-      </div>
-      <h2 className="font-heading text-xl font-semibold text-ink-900">{title}</h2>
-      <p className="max-w-sm text-sm text-ink-600">{description}</p>
-      {children ? <div className="mt-2 flex flex-wrap justify-center gap-2">{children}</div> : null}
+        <Icon className="size-11" strokeWidth={1.6} />
+      </span>
+      <h2 className="text-lg font-bold text-ink-900">{title}</h2>
+      <p className="max-w-[290px] text-sm text-ink-500">{description}</p>
+      {children ? <div className="mt-1.5 flex flex-col items-center gap-2.5">{children}</div> : null}
     </div>
   );
 }

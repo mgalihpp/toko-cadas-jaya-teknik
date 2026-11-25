@@ -17,7 +17,16 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
 
 export const FULFILLMENT_LABEL: Record<Fulfillment, string> = {
   kirim: "Dikirim",
-  ambil: "Ambil di toko",
+  ambil: "Ambil",
+};
+
+export const ORDER_STATUS_DOT: Record<OrderStatus, string> = {
+  menunggu_pembayaran: "bg-warning",
+  menunggu_konfirmasi: "bg-info",
+  dibayar: "bg-success",
+  diproses: "bg-brand-700",
+  selesai: "bg-ink-700",
+  dibatalkan: "bg-error",
 };
 
 export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {

@@ -1,293 +1,206 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  FlameIcon,
-  MoreHorizontalIcon,
-  PackageIcon,
-  PencilIcon,
-  PlusIcon,
-  SearchIcon,
-  Trash2Icon,
-} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronRightIcon, EyeIcon, EyeOffIcon, PackageIcon, PencilIcon, PlusIcon, SearchIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { EmptyState, ErrorState, PageHeader } from "@/components/shared";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { AdminHeader, AdminHeaderAction } from "@/components/layout";
+import { MLink } from "@/components/mobile/m-button";
+import { StickyBar } from "@/components/mobile/sticky-bar";
+import { SwipeRow } from "@/components/mobile/swipe-row";
+import { EmptyState, ErrorState } from "@/components/shared";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { ProductBadge } from "@/features/catalog";
+import { ProductThumb } from "@/features/cart";
 import { formatRupiah } from "@/lib/format";
-import { useTRPC } from "@/trpc/client";
+import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "../hooks/use-debounced-value";
+import { useTRPC } from "@/trpc/client";
 import { useSetProductActive } from "../hooks/use-product-mutations";
-import { AdminConditionBadge } from "./condition-badge";
-import { DeleteProductDialog } from "./delete-product-dialog";
 
-const PAGE_SIZE = 20;
-type StatusFilter = "semua" | "aktif" | "nonaktif";
+type Filter = "semua" | "aktif" | "nonaktif" | "menipis" | "bekas";
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: "semua", label: "Semua" },
+  { value: "aktif", label: "Aktif" },
+  { value: "nonaktif", label: "Nonaktif" },
+  { value: "menipis", label: "Stok menipis" },
+  { value: "bekas", label: "Bekas" },
+];
+
+const FILTER_INPUT = {
+  semua: {},
+  aktif: { isActive: true },
+  nonaktif: { isActive: false },
+  menipis: { lowStock: true },
+  bekas: { condition: "bekas" as const },
+} satisfies Record<Filter, object>;
 
 export function ProductList() {
   const trpc = useTRPC();
+  const [filter, setFilter] = useState<Filter>("semua");
+  const [searching, setSearching] = useState(false);
   const [q, setQ] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("semua");
-  const [page, setPage] = useState(1);
-  const [toDelete, setToDelete] = useState<{ id: string; name: string; isActive: boolean } | null>(null);
   const search = useDebouncedValue(q.trim());
-
-  const categories = useQuery(trpc.admin.categories.list.queryOptions());
-  const products = useQuery(
-    trpc.admin.products.list.queryOptions(
-      {
-        q: search || undefined,
-        categoryId: categoryId || undefined,
-        isActive: status === "semua" ? undefined : status === "aktif",
-        page,
-        pageSize: PAGE_SIZE,
-      },
-      { placeholderData: keepPreviousData }
-    )
-  );
   const setActive = useSetProductActive();
 
-  const data = products.data;
-  const filtered = Boolean(search || categoryId || status !== "semua");
-  const from = data ? (data.page - 1) * PAGE_SIZE + 1 : 0;
-  const to = data ? from + data.items.length - 1 : 0;
+  const products = useQuery(
+    trpc.admin.products.list.queryOptions({ ...FILTER_INPUT[filter], q: search || undefined, pageSize: 100 }),
+  );
+  const counts = {
+    semua: useQuery(trpc.admin.products.list.queryOptions({ ...FILTER_INPUT.semua, pageSize: 1 })).data?.total,
+    aktif: useQuery(trpc.admin.products.list.queryOptions({ ...FILTER_INPUT.aktif, pageSize: 1 })).data?.total,
+    nonaktif: useQuery(trpc.admin.products.list.queryOptions({ ...FILTER_INPUT.nonaktif, pageSize: 1 })).data?.total,
+    menipis: useQuery(trpc.admin.products.list.queryOptions({ ...FILTER_INPUT.menipis, pageSize: 1 })).data?.total,
+    bekas: useQuery(trpc.admin.products.list.queryOptions({ ...FILTER_INPUT.bekas, pageSize: 1 })).data?.total,
+  };
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
+    <div className="flex flex-1 flex-col pb-[76px]">
+      <AdminHeader
         title="Produk"
-        description={data ? `${data.total} produk` : "Memuat produk..."}
-        actions={
-          <Button asChild size="lg">
-            <Link href="/admin/produk/baru">
-              <PlusIcon />
-              Tambah Produk
-            </Link>
-          </Button>
+        right={
+          <AdminHeaderAction
+            label={searching ? "Tutup pencarian" : "Cari"}
+            onClick={() => {
+              if (searching) setQ("");
+              setSearching((s) => !s);
+            }}
+          >
+            {searching ? <XIcon className="size-6" strokeWidth={1.8} /> : <SearchIcon className="size-6" strokeWidth={1.8} />}
+          </AdminHeaderAction>
         }
       />
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <InputGroup className="h-9 bg-white sm:max-w-xs">
-          <InputGroupAddon>
-            <SearchIcon />
-          </InputGroupAddon>
-          <InputGroupInput
-            placeholder="Cari nama atau deskripsi"
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setPage(1);
-            }}
-            aria-label="Cari produk"
-          />
-        </InputGroup>
-        <div className="flex gap-2">
-          <NativeSelect
-            className="flex-1 bg-white sm:flex-none"
-            value={categoryId}
-            onChange={(e) => {
-              setCategoryId(e.target.value);
-              setPage(1);
-            }}
-            aria-label="Filter kategori"
-          >
-            <NativeSelectOption value="">Semua kategori</NativeSelectOption>
-            {categories.data?.map((c) => (
-              <NativeSelectOption key={c.id} value={c.id}>
-                {c.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-          <NativeSelect
-            className="flex-1 bg-white sm:flex-none"
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value as StatusFilter);
-              setPage(1);
-            }}
-            aria-label="Filter status"
-          >
-            <NativeSelectOption value="semua">Semua status</NativeSelectOption>
-            <NativeSelectOption value="aktif">Aktif</NativeSelectOption>
-            <NativeSelectOption value="nonaktif">Nonaktif</NativeSelectOption>
-          </NativeSelect>
+      {searching ? (
+        <div className="border-b border-ink-200 bg-white px-3 py-2">
+          <div className="flex h-11 items-center gap-2 rounded-[10px] bg-ink-50 px-3">
+            <SearchIcon className="size-5 text-brand-600" strokeWidth={2} />
+            <input
+              autoFocus
+              type="search"
+              aria-label="Cari produk"
+              placeholder="Cari nama atau SKU"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-500"
+            />
+          </div>
         </div>
+      ) : null}
+      <div className="cjt-no-scrollbar flex gap-2 overflow-x-auto border-b border-ink-200 bg-white px-3 py-2.5">
+        {FILTERS.map((f) => {
+          const active = filter === f.value;
+          return (
+            <button
+              key={f.value}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setFilter(f.value)}
+              className={cn(
+                "inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[17px] border-[1.5px] px-3.5 text-[13px] font-bold whitespace-nowrap",
+                active ? "border-brand-600 bg-brand-600 text-white" : "border-ink-200 bg-white text-ink-900",
+              )}
+            >
+              {f.label}
+              {counts[f.value] !== undefined ? <span className="font-medium opacity-80">{counts[f.value]}</span> : null}
+            </button>
+          );
+        })}
       </div>
 
-      {products.isError ? (
+      {products.isPending ? (
+        <ListSkeleton />
+      ) : products.isError ? (
         <ErrorState description={products.error.message} onRetry={() => products.refetch()} />
-      ) : data && data.items.length === 0 ? (
+      ) : products.data.items.length === 0 ? (
         <EmptyState
           icon={PackageIcon}
-          title={filtered ? "Produk tidak ditemukan" : "Belum ada produk"}
+          title={search || filter !== "semua" ? "Produk tidak ditemukan" : "Belum ada produk"}
           description={
-            filtered
-              ? "Coba kata kunci atau filter lain."
-              : "Tambahkan produk pertama agar tampil di katalog."
-          }
-          action={
-            filtered ? null : (
-              <Button asChild>
-                <Link href="/admin/produk/baru">
-                  <PlusIcon />
-                  Tambah Produk
-                </Link>
-              </Button>
-            )
+            search || filter !== "semua"
+              ? "Coba ubah kata kunci atau filter."
+              : "Tambahkan produk pertama untuk ditampilkan di katalog."
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-ink-200 bg-white">
-          <Table>
-            <TableHeader className="bg-ink-50">
-              <TableRow>
-                <TableHead className="pl-4">Produk</TableHead>
-                <TableHead>Kategori</TableHead>
-                <TableHead>Kondisi</TableHead>
-                <TableHead className="text-right">Harga</TableHead>
-                <TableHead className="text-right">Stok</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-20 pr-4">
-                  <span className="sr-only">Aksi</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data
-                ? data.items.map((p) => (
-                    <TableRow key={p.id} className={p.isActive ? undefined : "text-ink-500"}>
-                      <TableCell className="max-w-72 pl-4">
-                        <Link
-                          href={`/admin/produk/${p.id}`}
-                          className="block truncate font-medium text-ink-900 hover:text-brand-600"
-                        >
-                          {p.name}
-                        </Link>
-                        <span className="block truncate text-xs text-ink-500">/{p.slug}</span>
-                      </TableCell>
-                      <TableCell>{p.categoryName}</TableCell>
-                      <TableCell>
-                        <AdminConditionBadge condition={p.condition} />
-                      </TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {formatRupiah(p.price)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        <StockCell available={p.available} />
-                      </TableCell>
-                      <TableCell>
-                        <Switch
-                          checked={p.isActive}
-                          disabled={setActive.isPending && setActive.variables?.id === p.id}
-                          onCheckedChange={(isActive) => setActive.mutate({ id: p.id, isActive })}
-                          aria-label={p.isActive ? "Nonaktifkan produk" : "Aktifkan produk"}
-                          className="data-checked:bg-success"
-                        />
-                      </TableCell>
-                      <TableCell className="pr-4">
-                        <div className="flex justify-end gap-1">
-                          <Button asChild variant="ghost" size="icon-sm">
-                            <Link href={`/admin/produk/${p.id}`} aria-label={`Ubah ${p.name}`}>
-                              <PencilIcon />
-                            </Link>
-                          </Button>
-                          <DropdownMenu modal={false}>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon-sm" aria-label="Aksi lain">
-                                <MoreHorizontalIcon />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onSelect={() => setToDelete({ id: p.id, name: p.name, isActive: p.isActive })}
-                              >
-                                <Trash2Icon />
-                                Hapus
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                : Array.from({ length: 6 }, (_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={7} className="px-4">
-                        <Skeleton className="h-8 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-            </TableBody>
-          </Table>
-          {data && data.total > 0 ? (
-            <div className="flex items-center justify-between gap-2 border-t border-ink-200 px-4 py-3 text-sm text-ink-500">
-              <span>
-                {from} sampai {to} dari {data.total}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  <ChevronLeftIcon />
-                  Sebelumnya
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= data.pageCount}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Berikutnya
-                  <ChevronRightIcon />
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </div>
+        <ul>
+          {products.data.items.map((p) => (
+            <li key={p.id} className="border-b border-ink-200 bg-white">
+              <SwipeRow
+                actionWidth={168}
+                actions={
+                  <>
+                    <Link
+                      href={`/admin/produk/${p.id}`}
+                      className="flex flex-1 flex-col items-center justify-center gap-1 bg-brand-600 text-xs font-bold text-white"
+                    >
+                      <PencilIcon className="size-5" />
+                      Ubah
+                    </Link>
+                    <button
+                      type="button"
+                      disabled={setActive.isPending}
+                      onClick={() => setActive.mutate({ id: p.id, isActive: !p.isActive })}
+                      className="flex flex-1 flex-col items-center justify-center gap-1 bg-warning text-xs font-bold text-white"
+                    >
+                      {p.isActive ? <EyeOffIcon className="size-5" /> : <EyeIcon className="size-5" />}
+                      {p.isActive ? "Nonaktifkan" : "Aktifkan"}
+                    </button>
+                  </>
+                }
+              >
+                <Link href={`/admin/produk/${p.id}`} className="flex items-center gap-3 p-3">
+                  <ProductThumb src={p.thumbnailUrl} alt="" className="size-[60px] rounded-[10px]" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <p className="line-clamp-2 text-sm font-medium text-ink-900">{p.name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <ProductBadge kind={p.condition} />
+                      <span
+                        className={cn(
+                          "inline-flex rounded-md px-2 py-[3px] text-[11px] leading-[1.2] font-bold",
+                          p.isActive ? "bg-success-soft text-success" : "bg-ink-100 text-ink-500",
+                        )}
+                      >
+                        {p.isActive ? "Aktif" : "Nonaktif"}
+                      </span>
+                      <span className={cn("text-xs font-medium", p.condition === "bekas" ? "text-warning" : "text-ink-500")}>
+                        {p.condition === "bekas" ? `Sisa ${p.available} unit` : `Stok ${p.available}`}
+                      </span>
+                    </div>
+                    <p className="text-[15px] font-bold text-brand-700">{formatRupiah(p.price)}</p>
+                  </div>
+                  <ChevronRightIcon className="size-[18px] shrink-0 text-ink-500" />
+                </Link>
+              </SwipeRow>
+            </li>
+          ))}
+        </ul>
       )}
 
-      <DeleteProductDialog product={toDelete} onOpenChange={(open) => !open && setToDelete(null)} />
+      <StickyBar className="bottom-[68px]">
+        <MLink href="/admin/produk/baru" size="lg" block>
+          <PlusIcon className="size-[18px]" />
+          Tambah produk
+        </MLink>
+      </StickyBar>
     </div>
   );
 }
 
-function StockCell({ available }: { available: number }) {
-  if (available <= 0) {
-    return <span className="text-xs font-semibold text-error">Habis</span>;
-  }
-  if (available <= 2) {
-    return (
-      <span className="inline-flex items-center gap-1 font-semibold text-warning">
-        <FlameIcon className="size-3.5" />
-        {available}
-      </span>
-    );
-  }
-  return <span className="font-medium text-ink-900">{available}</span>;
+export function ListSkeleton() {
+  return (
+    <div role="status" className="flex flex-col">
+      <span className="sr-only">Memuat produk</span>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div key={i} className="flex items-center gap-3 border-b border-ink-200 bg-white p-3">
+          <Skeleton className="size-[60px] rounded-[10px]" />
+          <div className="flex flex-1 flex-col gap-2">
+            <Skeleton className="h-3.5 w-4/5" />
+            <Skeleton className="h-3 w-1/2" />
+            <Skeleton className="h-4 w-1/3" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }

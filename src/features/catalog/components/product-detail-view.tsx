@@ -1,77 +1,58 @@
 "use client";
 
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { ChevronRightIcon } from "lucide-react";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { StoreIcon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { todayHours } from "@/features/admin-settings/hours";
+import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { catalogHref, RELATED_LIMIT, relatedProductsInput } from "../schemas";
 import type { ProductDetail } from "../types";
-import { CONTAINER } from "./container";
-import { ProductBuyBox } from "./product-buy-box";
-import { ProductCard } from "./product-card";
+import { ProductBuyBar } from "./product-buy-box";
+import { ProductBadge, ProductCard } from "./product-card";
 import { ProductGallery } from "./product-gallery";
 
-function ProductInfoTabs({ product }: { product: ProductDetail }) {
-  const specs = Object.entries(product.specs ?? {}).filter(([key, value]) => key && value);
-  const trigger =
-    "h-auto! flex-none rounded-none border-0 px-0 pb-3.5 text-[15px] font-medium text-ink-500 data-active:font-bold data-active:text-ink-900";
+function Divider() {
+  return <div className="h-2 shrink-0 bg-ink-50" />;
+}
+
+function SpecRow({ label, value }: { label: string; value: string }) {
   return (
-    <Tabs defaultValue="deskripsi" className="gap-6">
-      <TabsList
-        variant="line"
-        className="h-auto! w-full justify-start gap-6 border-b sm:gap-8 border-ink-200 p-0"
-      >
-        <TabsTrigger value="deskripsi" className={trigger}>
-          Deskripsi
-        </TabsTrigger>
-        <TabsTrigger value="spesifikasi" className={trigger}>
-          Spesifikasi
-        </TabsTrigger>
-        <TabsTrigger value="pengiriman" className={trigger}>
-          Pengiriman
-        </TabsTrigger>
-      </TabsList>
-      <TabsContent value="deskripsi" className="min-w-0">
-        {product.description ? (
-          <p className="max-w-prose text-[15px] leading-relaxed whitespace-pre-line text-ink-600">
-            {product.description}
+    <div className="flex items-center gap-2 border-b border-ink-200 py-[9px] last:border-b-0">
+      <dt className="w-[110px] shrink-0 text-sm text-ink-500">{label}</dt>
+      <dd className="min-w-0 flex-1 text-sm font-medium text-ink-900">{value}</dd>
+    </div>
+  );
+}
+
+function StoreCard() {
+  const trpc = useTRPC();
+  const { data } = useQuery(trpc.settings.get.queryOptions());
+  const hours = data?.openingHours ? todayHours(data.openingHours) : null;
+  return (
+    <section className="flex items-center gap-2.5 bg-white p-3">
+      <span className="flex size-11 items-center justify-center rounded-full bg-brand-100">
+        <StoreIcon className="size-6 text-brand-600" strokeWidth={1.8} />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <p className="text-[15px] font-bold text-ink-900">Cadas Jaya Teknik</p>
+        {hours ? (
+          <p className={cn("text-xs font-medium", hours.open ? "text-success" : "text-ink-500")}>
+            {hours.open
+              ? `Buka hari ini ${hours.from.replace(":", ".")} – ${hours.to.replace(":", ".")}`
+              : "Tutup hari ini"}
           </p>
-        ) : (
-          <p className="text-sm text-ink-500">Deskripsi belum diisi untuk produk ini.</p>
-        )}
-      </TabsContent>
-      <TabsContent value="spesifikasi" className="min-w-0">
-        {specs.length > 0 ? (
-          <dl className="flex max-w-2xl flex-col">
-            {specs.map(([key, value], i) => (
-              <div
-                key={key}
-                className={cn(
-                  "flex items-center justify-between gap-6 px-3.5 py-3 text-sm",
-                  i % 2 === 0 && "bg-ink-50"
-                )}
-              >
-                <dt className="text-ink-500">{key}</dt>
-                <dd className="text-right font-semibold text-ink-900">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : (
-          <p className="text-sm text-ink-500">Spesifikasi belum diisi untuk produk ini.</p>
-        )}
-      </TabsContent>
-      <TabsContent value="pengiriman" className="min-w-0">
-        <ul className="flex max-w-prose flex-col gap-3 text-[15px] text-ink-600">
-          <li>Ambil di toko: siap setelah pembayaran dikonfirmasi Owner.</li>
-          <li>Dikirim: ongkir dikonfirmasi Owner setelah pesanan dibuat.</li>
-          <li>Pembayaran tunai saat serah terima, atau transfer ke rekening toko dan unggah bukti.</li>
-          <li>Pesanan transfer tanpa bukti dalam 24 jam dibatalkan otomatis dan stok dilepas.</li>
-        </ul>
-      </TabsContent>
-    </Tabs>
+        ) : null}
+      </div>
+      <Link
+        href="/kontak"
+        className="rounded-lg border-[1.5px] border-brand-600 px-3 py-2 text-[13px] font-bold text-brand-700"
+      >
+        Lihat kontak
+      </Link>
+    </section>
   );
 }
 
@@ -82,78 +63,104 @@ function RelatedProducts({ product }: { product: ProductDetail }) {
   );
   const items = data.items.filter((p) => p.id !== product.id).slice(0, RELATED_LIMIT);
   if (items.length === 0) return null;
-
   return (
-    <section className="bg-ink-50 py-14 lg:pt-[72px] lg:pb-24" aria-labelledby="produk-serupa">
-      <div className={cn(CONTAINER, "flex flex-col gap-7")}>
-        <div className="flex items-end justify-between gap-4">
-          <h2 id="produk-serupa" className="text-2xl font-bold text-ink-900 lg:text-[28px]">
+    <>
+      <Divider />
+      <section className="flex flex-col gap-2.5 bg-white p-3" aria-labelledby="produk-serupa">
+        <div className="flex items-center">
+          <h2 id="produk-serupa" className="flex-1 text-base font-bold text-ink-900">
             Produk serupa
           </h2>
           <Link
             href={catalogHref({ categorySlug: product.categorySlug })}
-            className="text-sm font-semibold text-brand-700 hover:underline"
+            className="text-[13px] font-bold text-brand-600"
           >
-            Lihat semua
+            Semua
           </Link>
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 lg:grid-cols-4">
+        <div className="cjt-no-scrollbar flex gap-2.5 overflow-x-auto">
           {items.map((item) => (
-            <ProductCard key={item.id} product={item} />
+            <ProductCard key={item.id} product={item} className="w-[138px] shrink-0" />
           ))}
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
 
 export function ProductDetailView({ slug }: { slug: string }) {
   const trpc = useTRPC();
   const { data: product } = useSuspenseQuery(trpc.catalog.productBySlug.queryOptions({ slug }));
+  const available = Math.max(0, Number(product.available));
+  const used = product.condition === "bekas";
+  const specs = Object.entries(product.specs ?? {}).filter(([key, value]) => key && value);
 
   return (
-    <div className="flex flex-col pb-24 lg:pb-0">
-      <nav
-        aria-label="Breadcrumb"
-        className={cn(CONTAINER, "flex flex-wrap items-center gap-1.5 pt-7 text-[13px]")}
-      >
-        <Link href="/" className="text-ink-500 hover:text-ink-900">
-          Beranda
-        </Link>
-        <ChevronRightIcon className="size-3.5 text-ink-300" />
-        <Link href="/produk" className="text-ink-500 hover:text-ink-900">
-          Produk
-        </Link>
-        <ChevronRightIcon className="size-3.5 text-ink-300" />
-        <Link
-          href={catalogHref({ categorySlug: product.categorySlug })}
-          className="text-ink-500 hover:text-ink-900"
-        >
-          {product.categoryName}
-        </Link>
-        <ChevronRightIcon className="size-3.5 text-ink-300" />
-        <span className="line-clamp-1 font-semibold text-ink-900" aria-current="page">
-          {product.name}
-        </span>
-      </nav>
+    <div className="flex flex-1 flex-col pb-[76px]">
+      <ProductGallery productId={product.id} images={product.images} name={product.name} />
 
-      <div
-        className={cn(
-          CONTAINER,
-          "grid gap-8 pt-6 pb-10 lg:grid-cols-[minmax(0,640px)_minmax(0,1fr)] lg:gap-14 lg:pb-14"
-        )}
-      >
-        <ProductGallery images={product.images} name={product.name} condition={product.condition} />
-        <ProductBuyBox product={product} />
-      </div>
-
-      <section className={cn(CONTAINER, "pb-16 lg:pb-[88px]")} aria-label="Informasi produk">
-        <ProductInfoTabs product={product} />
+      <section className="flex flex-col gap-2 bg-white p-3">
+        <div className="flex items-center gap-1.5">
+          <ProductBadge kind={product.condition} />
+          {available <= 0 ? <ProductBadge kind="habis" /> : null}
+        </div>
+        <p className="text-[26px] leading-[1.35] font-bold text-brand-700">{formatRupiah(product.price)}</p>
+        <h1 className="text-base leading-[1.35] font-medium text-ink-900">{product.name}</h1>
+        {used && available > 0 ? (
+          <div className="flex gap-2.5 rounded-[10px] border border-warning-border bg-warning-soft p-3">
+            <TriangleAlertIcon className="size-5 shrink-0 text-warning" strokeWidth={2} />
+            <div className="flex flex-col gap-0.5">
+              <p className="text-sm font-bold text-warning">Barang bekas, stok {available} unit</p>
+              <p className="text-[13px] text-ink-900">
+                {available === 1
+                  ? "Hanya tersisa 1 unit. Stok dikunci saat kamu checkout, jadi tidak bisa dipesan orang lain."
+                  : `Tersisa ${available} unit. Stok dikunci saat kamu checkout.`}
+              </p>
+            </div>
+          </div>
+        ) : null}
+        {available <= 0 ? (
+          <div className="flex gap-2.5 rounded-[10px] border border-error-border bg-error-soft p-3">
+            <TriangleAlertIcon className="size-5 shrink-0 text-error" strokeWidth={2} />
+            <div className="flex flex-col gap-0.5">
+              <p className="text-sm font-bold text-error">Stok habis</p>
+              <p className="text-[13px] text-ink-900">
+                Unit ini sedang tidak tersedia. Cek lagi nanti atau lihat produk serupa di bawah.
+              </p>
+            </div>
+          </div>
+        ) : null}
       </section>
+
+      <Divider />
+      <section className="bg-white p-3">
+        <h2 className="text-base font-bold text-ink-900">Spesifikasi</h2>
+        <dl className="flex flex-col">
+          <SpecRow label="Kondisi" value={used ? "Bekas" : "Baru"} />
+          <SpecRow label="Kategori" value={product.categoryName} />
+          {specs.map(([key, value]) => (
+            <SpecRow key={key} label={key} value={value} />
+          ))}
+          <SpecRow label="Stok" value={`${available} unit`} />
+        </dl>
+      </section>
+
+      <Divider />
+      <section className="flex flex-col gap-2 bg-white p-3">
+        <h2 className="text-base font-bold text-ink-900">Deskripsi produk</h2>
+        <p className="text-sm leading-normal whitespace-pre-line text-ink-900">
+          {product.description || "Deskripsi belum diisi untuk produk ini."}
+        </p>
+      </section>
+
+      <Divider />
+      <StoreCard />
 
       <Suspense fallback={null}>
         <RelatedProducts product={product} />
       </Suspense>
+
+      <ProductBuyBar product={product} />
     </div>
   );
 }
