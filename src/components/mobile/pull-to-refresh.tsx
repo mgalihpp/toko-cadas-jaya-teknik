@@ -31,6 +31,11 @@ export function PullToRefresh({ onRefresh }: { onRefresh?: () => Promise<unknown
       pullRef.current = Math.min(dy * 0.5, 100);
       setPull(pullRef.current);
     };
+    const cancel = () => {
+      startY.current = null;
+      pullRef.current = 0;
+      setPull(0);
+    };
     const end = async () => {
       const triggered = pullRef.current >= TRIGGER;
       startY.current = null;
@@ -51,7 +56,9 @@ export function PullToRefresh({ onRefresh }: { onRefresh?: () => Promise<unknown
     window.addEventListener("touchstart", start, { passive: true });
     window.addEventListener("touchmove", move, { passive: true });
     window.addEventListener("touchend", end, { passive: true });
+    window.addEventListener("touchcancel", cancel, { passive: true });
     return () => {
+      window.removeEventListener("touchcancel", cancel);
       window.removeEventListener("touchstart", start);
       window.removeEventListener("touchmove", move);
       window.removeEventListener("touchend", end);
