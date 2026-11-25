@@ -34,11 +34,7 @@ export function useCartSelection(allIds: string[]) {
     },
     []
   );
-  const setAll = useCallback(
-    (checked: boolean) => write(checked ? [] : allIds),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allIds.join(",")]
-  );
+  const setAll = (checked: boolean) => write(checked ? [] : allIds);
 
   return {
     selected,

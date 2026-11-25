@@ -1,567 +1,336 @@
 "use client";
 
-import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  CheckIcon,
-  CircleCheckIcon,
-  ClockIcon,
-  MailIcon,
-  MapPinIcon,
-  PencilIcon,
-  PhoneIcon,
-  PlusIcon,
-  StarIcon,
-  Trash2Icon,
-  XIcon,
-} from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckIcon, ClockIcon, MapPinIcon, MinusIcon, PhoneIcon, PlusIcon, Trash2Icon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AdminHeader } from "@/components/layout";
+import { MButton } from "@/components/mobile/m-button";
+import { BottomSheet, SheetClose, SheetRoot } from "@/components/mobile/sheet";
+import { StickyBar } from "@/components/mobile/sticky-bar";
 import { ErrorState } from "@/components/shared";
-import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
-import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { DAYS, parseWeek, serializeWeek, type Day, type WeekHours } from "../hours";
+import { DAYS, parseWeek, serializeWeek, summarizeWeek, type WeekHours } from "../hours";
 import { MAX_BANK_ACCOUNTS, storeSettingsSchema, type StoreSettingsValues } from "../schemas";
 
-type Errors = Record<string, string>;
-type BankAccount = StoreSettingsValues["bankAccounts"][number];
+type Errors = Record<string, string | undefined>;
 
-const FORM_ID = "store-settings-form";
+const box = (bad?: boolean, focused?: boolean) =>
+  cn(
+    "w-full rounded-[10px] bg-white px-3 text-[15px] text-ink-900 outline-none placeholder:text-ink-500",
+    bad ? "border-2 border-error" : focused ? "border-2 border-brand-600" : "border-[1.5px] border-ink-200 focus:border-2 focus:border-brand-600",
+  );
 
-const BANK_COLORS: Record<string, string> = {
-  BCA: "#1D4ED8",
-  BRI: "#0B4EA2",
-};
-
-const box =
-  "flex gap-2 rounded-[8px] border border-ink-300 bg-white px-3 py-3 transition-[color,box-shadow] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 has-aria-invalid:border-destructive has-aria-invalid:ring-3 has-aria-invalid:ring-destructive/20";
-const boxControl =
-  "w-full min-w-0 bg-transparent text-sm leading-4 text-ink-900 outline-none placeholder:text-ink-500";
-const labelText = "text-[13px] leading-4 font-semibold text-ink-900";
-
-function SaveButton({ pending, disabled, className }: { pending: boolean; disabled?: boolean; className?: string }) {
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
-    <Button
-      type="submit"
-      form={FORM_ID}
-      disabled={pending || disabled}
-      className={cn(
-        "h-auto gap-2 rounded-[8px] bg-brand-600 px-4 py-[9px] text-sm leading-[17px] font-semibold text-white hover:bg-brand-700",
-        className
-      )}
-    >
-      {pending ? <Spinner /> : <CheckIcon />}
-      Simpan
-    </Button>
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[13px] font-medium text-ink-900">{label}</span>
+      {children}
+      {error ? <p className="text-xs font-medium text-error">{error}</p> : null}
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <>
+      <section className="flex flex-col gap-3 bg-white p-3">
+        <h2 className="text-[15px] font-bold text-ink-900">{title}</h2>
+        {children}
+      </section>
+      <div className="h-1.5 shrink-0" />
+    </>
   );
 }
 
 export function StoreSettings() {
   const trpc = useTRPC();
   const settings = useQuery(trpc.settings.get.queryOptions());
-  const pending = useIsMutating({ mutationKey: trpc.settings.update.mutationKey() }) > 0;
-  const [saved, setSaved] = useState(false);
 
-  return (
-    <div className="flex flex-col gap-7">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-heading text-2xl font-bold tracking-[-0.6px] text-ink-900 sm:text-[26px] sm:leading-[33px]">
-          Pengaturan Toko
-        </h1>
-        <SaveButton pending={pending} disabled={!settings.data} className="max-sm:hidden" />
-      </div>
-      {saved ? (
-        <div className="flex items-center gap-2.5 rounded-[10px] border border-success-border bg-success-soft px-4 py-[11px] text-success">
-          <CircleCheckIcon className="size-[18px] shrink-0" />
-          <p className="flex-1 text-sm leading-[17px] font-medium">
-            Perubahan disimpan. Halaman kontak dan checkout sudah memakai data terbaru.
-          </p>
-          <button
-            type="button"
-            aria-label="Tutup pemberitahuan"
-            onClick={() => setSaved(false)}
-            className="shrink-0 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            <XIcon className="size-4" />
-          </button>
-        </div>
-      ) : null}
-      {settings.isError ? (
+  if (settings.isError) {
+    return (
+      <div className="flex flex-1 flex-col">
+        <AdminHeader title="Pengaturan toko" backHref="/admin" />
         <ErrorState onRetry={() => settings.refetch()} />
-      ) : settings.isPending ? (
-        <div className="flex flex-col gap-7">
-          <Skeleton className="h-52 rounded-[12px]" />
-          <Skeleton className="h-36 rounded-[12px]" />
+      </div>
+    );
+  }
+  if (settings.isPending) {
+    return (
+      <div className="flex flex-1 flex-col">
+        <AdminHeader title="Pengaturan toko" backHref="/admin" />
+        <div role="status" className="flex flex-col gap-1.5">
+          <Skeleton className="h-52 rounded-none" />
+          <Skeleton className="h-52 rounded-none" />
         </div>
-      ) : (
-        <SettingsForm
-          key={settings.data.updatedAt.getTime()}
-          initial={{
-            bankAccounts: settings.data.bankAccounts,
-            address: settings.data.address,
-            phone: settings.data.phone,
-            email: settings.data.email,
-            paymentWindowHours: settings.data.paymentWindowHours,
-            openingHours: settings.data.openingHours,
-          }}
-          pending={pending}
-          onDirty={() => setSaved(false)}
-          onSaved={() => setSaved(true)}
-        />
-      )}
-    </div>
+      </div>
+    );
+  }
+  return (
+    <SettingsForm
+      key={settings.data.updatedAt.getTime()}
+      initial={{
+        bankAccounts: settings.data.bankAccounts,
+        address: settings.data.address,
+        phone: settings.data.phone,
+        email: settings.data.email,
+        paymentWindowHours: settings.data.paymentWindowHours,
+        openingHours: settings.data.openingHours,
+      }}
+    />
   );
 }
 
-function SettingsForm({
-  initial,
-  pending,
-  onDirty,
-  onSaved,
-}: {
-  initial: StoreSettingsValues;
-  pending: boolean;
-  onDirty: () => void;
-  onSaved: () => void;
-}) {
+function SettingsForm({ initial }: { initial: StoreSettingsValues }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [values, setValues] = useState<StoreSettingsValues>(initial);
-  const [editing, setEditing] = useState<boolean[]>(() => initial.bankAccounts.map(() => false));
+  const [values, setValues] = useState<StoreSettingsValues>({
+    ...initial,
+    bankAccounts: initial.bankAccounts.length ? initial.bankAccounts : [{ bank: "", number: "", holder: "" }],
+  });
   const [errors, setErrors] = useState<Errors>({});
   const [week, setWeek] = useState<WeekHours>(() => parseWeek(initial.openingHours));
+  const [hoursOpen, setHoursOpen] = useState(false);
+
   const update = useMutation(
     trpc.settings.update.mutationOptions({
       onSuccess: async () => {
-        toast.success("Pengaturan toko disimpan");
-        onSaved();
+        toast.success("Pengaturan disimpan");
         await queryClient.invalidateQueries({ queryKey: trpc.settings.get.queryKey() });
       },
-      onError: (error) => toast.error(error.message || "Gagal menyimpan pengaturan"),
-    })
+      onError: (error) => toast.error(error.message),
+    }),
   );
 
-  function patch(next: Partial<StoreSettingsValues>) {
-    setValues((v) => ({ ...v, ...next }));
-    onDirty();
-  }
-
-  function setPrimary(index: number) {
-    patch({
-      bankAccounts: values.bankAccounts.map((a, i) => ({ ...a, primary: i === index ? true : undefined })),
-    });
-  }
-
-  function patchDay(day: Day, next: Partial<WeekHours[Day]>) {
-    const updated = { ...week, [day]: { ...week[day], ...next } };
-    setWeek(updated);
-    patch({ openingHours: serializeWeek(updated) });
-  }
-
-  function patchAccount(index: number, field: "bank" | "number" | "holder", value: string) {
-    patch({
-      bankAccounts: values.bankAccounts.map((a, i) => (i === index ? { ...a, [field]: value } : a)),
-    });
-  }
-
-  function setEditingAt(index: number, open: boolean) {
-    setEditing((e) => e.map((v, i) => (i === index ? open : v)));
-  }
-
-  function removeAccount(index: number) {
-    patch({ bankAccounts: values.bankAccounts.filter((_, i) => i !== index) });
-    setEditing((e) => e.filter((_, i) => i !== index));
+  function patch(changes: Partial<StoreSettingsValues>) {
+    setValues((v) => ({ ...v, ...changes }));
     setErrors({});
   }
 
-  function addAccount() {
-    patch({ bankAccounts: [...values.bankAccounts, { bank: "", number: "", holder: "" }] });
-    setEditing((e) => [...e, true]);
+  function setAccount(index: number, field: "bank" | "number" | "holder", value: string) {
+    patch({ bankAccounts: values.bankAccounts.map((a, i) => (i === index ? { ...a, [field]: value } : a)) });
   }
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const result = storeSettingsSchema.safeParse(values);
+  function submit() {
+    const accounts = values.bankAccounts.filter((a) => a.bank.trim() || a.number.trim() || a.holder.trim());
+    const result = storeSettingsSchema.safeParse({ ...values, bankAccounts: accounts, openingHours: values.openingHours });
     if (!result.success) {
       const next: Errors = {};
-      for (const issue of result.error.issues) {
-        const key = issue.path.join(".");
-        next[key] ??= issue.message;
-      }
+      for (const issue of result.error.issues) next[issue.path.join(".")] ??= issue.message;
       setErrors(next);
-      toast.error("Periksa kembali isian yang ditandai");
       return;
     }
-    setErrors({});
-    const accounts = result.data.bankAccounts;
-    const primaryFirst = [...accounts.filter((a) => a.primary), ...accounts.filter((a) => !a.primary)];
-    update.mutate({ ...result.data, bankAccounts: primaryFirst });
+    update.mutate(result.data);
   }
 
-  const accountHasError = (index: number) =>
-    Object.keys(errors).some((key) => key.startsWith(`bankAccounts.${index}.`));
+  const summary = values.openingHours ? summarizeWeek(parseWeek(values.openingHours)) : null;
+  const stepBtn = "flex size-[34px] items-center justify-center text-brand-700 disabled:text-ink-300";
 
   return (
-    <form id={FORM_ID} onSubmit={submit} className="flex flex-col gap-7" noValidate>
-      <Section
-        title="Rekening transfer"
-        description="Tampil di checkout dan halaman detail pesanan pelanggan"
-      >
-        {values.bankAccounts.length === 0 ? (
-          <p className="rounded-[12px] border border-dashed border-ink-300 px-4 py-6 text-center text-sm text-ink-500">
-            Belum ada rekening. Pelanggan tidak dapat membayar dengan transfer sampai rekening
-            ditambahkan.
-          </p>
+    <div className="flex flex-1 flex-col pb-[76px]">
+      <AdminHeader title="Pengaturan toko" backHref="/admin" />
+
+      <Section title="Rekening tujuan transfer">
+        {values.bankAccounts.map((account, index) => (
+          <div key={index} className="flex flex-col gap-3">
+            {index > 0 ? (
+              <div className="flex items-center">
+                <p className="flex-1 text-[13px] font-bold text-ink-500">Rekening {index + 1}</p>
+                <button
+                  type="button"
+                  aria-label={`Hapus rekening ${index + 1}`}
+                  onClick={() => patch({ bankAccounts: values.bankAccounts.filter((_, i) => i !== index) })}
+                  className="text-error"
+                >
+                  <Trash2Icon className="size-[18px]" />
+                </button>
+              </div>
+            ) : null}
+            <Field label="Nama bank" error={errors[`bankAccounts.${index}.bank`]}>
+              <input
+                className={cn(box(Boolean(errors[`bankAccounts.${index}.bank`])), "h-12")}
+                value={account.bank}
+                placeholder="Contoh: BCA"
+                onChange={(e) => setAccount(index, "bank", e.target.value)}
+              />
+            </Field>
+            <Field label="Nomor rekening" error={errors[`bankAccounts.${index}.number`]}>
+              <input
+                inputMode="numeric"
+                className={cn(box(Boolean(errors[`bankAccounts.${index}.number`])), "h-12")}
+                value={account.number}
+                onChange={(e) => setAccount(index, "number", e.target.value)}
+              />
+            </Field>
+            <Field label="Atas nama" error={errors[`bankAccounts.${index}.holder`]}>
+              <input
+                className={cn(box(Boolean(errors[`bankAccounts.${index}.holder`])), "h-12")}
+                value={account.holder}
+                onChange={(e) => setAccount(index, "holder", e.target.value)}
+              />
+            </Field>
+          </div>
+        ))}
+        {values.bankAccounts.length < MAX_BANK_ACCOUNTS ? (
+          <button
+            type="button"
+            onClick={() => patch({ bankAccounts: [...values.bankAccounts, { bank: "", number: "", holder: "" }] })}
+            className="flex items-center gap-1.5 self-start text-[13px] font-bold text-brand-600"
+          >
+            <PlusIcon className="size-4" />
+            Tambah rekening
+          </button>
         ) : null}
-        {values.bankAccounts.map((account, index) =>
-          editing[index] || accountHasError(index) ? (
-            <BankAccountEditor
-              key={index}
-              index={index}
-              account={account}
-              errors={errors}
-              onChange={(field, value) => patchAccount(index, field, value)}
-              onDone={() => setEditingAt(index, false)}
-              onRemove={() => removeAccount(index)}
-            />
-          ) : (
-            <BankAccountRow
-              key={index}
-              account={account}
-              onEdit={() => setEditingAt(index, true)}
-              onPrimary={() => setPrimary(index)}
-            />
-          )
-        )}
-        {errors.bankAccounts ? <FieldError>{errors.bankAccounts}</FieldError> : null}
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-auto w-fit gap-2 rounded-[8px] px-4 py-[9px] text-sm leading-[17px] font-semibold text-brand-700 hover:bg-brand-50 hover:text-brand-700"
-          disabled={values.bankAccounts.length >= MAX_BANK_ACCOUNTS}
-          onClick={addAccount}
-        >
-          <PlusIcon />
-          Tambah rekening
-        </Button>
+        {errors.bankAccounts ? <p className="text-xs font-medium text-error">{errors.bankAccounts}</p> : null}
       </Section>
 
-      <Section title="Informasi kontak" description="Tampil di footer dan halaman kontak">
-        <Field data-invalid={Boolean(errors.address)} className="gap-1.5">
-          <FieldLabel htmlFor="address" className={labelText}>
-            Alamat toko
-          </FieldLabel>
-          <div className={cn(box, "items-start")}>
-            <MapPinIcon className="size-4 shrink-0 text-ink-500" />
+      <Section title="Kontak dan lokasi">
+        <Field label="Alamat toko" error={errors.address}>
+          <div className={cn(box(Boolean(errors.address)), "flex items-start gap-2 py-3")}>
+            <MapPinIcon className="mt-0.5 size-5 shrink-0 text-ink-500" strokeWidth={1.8} />
             <textarea
-              id="address"
+              rows={2}
+              className="min-w-0 flex-1 resize-none bg-transparent outline-none placeholder:text-ink-500"
               value={values.address}
               onChange={(e) => patch({ address: e.target.value })}
-              rows={1}
-              maxLength={500}
-              aria-invalid={Boolean(errors.address)}
-              className={cn(boxControl, "field-sizing-content resize-none")}
             />
           </div>
-          {errors.address ? <FieldError>{errors.address}</FieldError> : null}
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field data-invalid={Boolean(errors.phone)} className="gap-1.5">
-            <FieldLabel htmlFor="phone" className={labelText}>
-              Telepon atau WhatsApp
-            </FieldLabel>
-            <div className={cn(box, "items-center")}>
-              <PhoneIcon className="size-4 shrink-0 text-ink-500" />
-              <input
-                id="phone"
-                value={values.phone}
-                placeholder="0812 3456 7890"
-                inputMode="tel"
-                aria-invalid={Boolean(errors.phone)}
-                onChange={(e) => patch({ phone: e.target.value })}
-                className={boxControl}
-              />
-            </div>
-            {errors.phone ? <FieldError>{errors.phone}</FieldError> : null}
-          </Field>
-          <Field data-invalid={Boolean(errors.email)} className="gap-1.5">
-            <FieldLabel htmlFor="email" className={labelText}>
-              Email
-            </FieldLabel>
-            <div className={cn(box, "items-center")}>
-              <MailIcon className="size-4 shrink-0 text-ink-500" />
-              <input
-                id="email"
-                type="email"
-                value={values.email}
-                placeholder="toko@contoh.com"
-                aria-invalid={Boolean(errors.email)}
-                onChange={(e) => patch({ email: e.target.value })}
-                className={boxControl}
-              />
-            </div>
-            {errors.email ? <FieldError>{errors.email}</FieldError> : null}
-          </Field>
-        </div>
-      </Section>
-
-      <Section title="Jam operasional" description="Aktifkan hari buka dan atur jamnya. Tampil di halaman kontak">
-        <div className="flex flex-col divide-y divide-ink-200 rounded-[12px] border border-ink-200">
-          {DAYS.map((day) => {
-            const h = week[day];
-            return (
-              <div key={day} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-                <Switch
-                  checked={h.open}
-                  onCheckedChange={(open) => patchDay(day, { open })}
-                  aria-label={`${day} buka`}
-                />
-                <span className="w-16 text-sm leading-[17px] font-semibold text-ink-900">{day}</span>
-                {h.open ? (
-                  <div className="flex items-center gap-2 text-sm text-ink-600">
-                    <input
-                      type="time"
-                      value={h.from}
-                      aria-label={`${day} jam buka`}
-                      onChange={(e) => patchDay(day, { from: e.target.value })}
-                      className="h-9 rounded-[8px] border border-ink-300 bg-white px-2 text-sm text-ink-900 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                    />
-                    <span>sampai</span>
-                    <input
-                      type="time"
-                      value={h.to}
-                      aria-label={`${day} jam tutup`}
-                      onChange={(e) => patchDay(day, { to: e.target.value })}
-                      className="h-9 rounded-[8px] border border-ink-300 bg-white px-2 text-sm text-ink-900 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                    />
-                  </div>
-                ) : (
-                  <span className="text-sm text-ink-500">Tutup</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {errors.openingHours ? <FieldError>{errors.openingHours}</FieldError> : null}
-      </Section>
-
-      <Section
-        title="Pembayaran"
-        description="Batas waktu pelanggan mengunggah bukti transfer. Pesanan yang lewat batas dibatalkan otomatis"
-      >
-        <Field data-invalid={Boolean(errors.paymentWindowHours)} className="max-w-60 gap-1.5">
-          <FieldLabel htmlFor="payment-window" className={labelText}>
-            Batas waktu pembayaran
-          </FieldLabel>
-          <div className={cn(box, "items-center")}>
-            <ClockIcon className="size-4 shrink-0 text-ink-500" />
+        <Field label="Telepon" error={errors.phone}>
+          <div className={cn(box(Boolean(errors.phone)), "flex h-12 items-center gap-2")}>
+            <PhoneIcon className="size-5 shrink-0 text-ink-500" strokeWidth={1.8} />
             <input
-              id="payment-window"
-              type="number"
-              min={1}
-              max={168}
-              inputMode="numeric"
-              value={Number.isNaN(values.paymentWindowHours) ? "" : values.paymentWindowHours}
-              aria-invalid={Boolean(errors.paymentWindowHours)}
-              onChange={(e) => patch({ paymentWindowHours: e.target.valueAsNumber })}
-              className={boxControl}
+              type="tel"
+              inputMode="tel"
+              className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-ink-500"
+              value={values.phone}
+              onChange={(e) => patch({ phone: e.target.value })}
             />
-            <span className="text-sm text-ink-500">jam</span>
           </div>
-          {errors.paymentWindowHours ? <FieldError>{errors.paymentWindowHours}</FieldError> : null}
+        </Field>
+        <Field label="Jam operasional" error={errors.openingHours}>
+          <button
+            type="button"
+            onClick={() => setHoursOpen(true)}
+            className={cn(box(Boolean(errors.openingHours)), "flex h-12 items-center gap-2 text-left")}
+          >
+            <ClockIcon className="size-5 shrink-0 text-ink-500" strokeWidth={1.8} />
+            <span className="min-w-0 flex-1 truncate">{summary?.open || "Atur jam operasional"}</span>
+          </button>
         </Field>
       </Section>
 
-      <div className="sticky bottom-0 -mx-4 border-t border-ink-200 bg-white/90 px-4 py-3 backdrop-blur sm:hidden">
-        <SaveButton pending={pending} className="w-full" />
-      </div>
-    </form>
-  );
-}
+      <section className="flex flex-col gap-2.5 bg-white p-3">
+        <h2 className="text-[15px] font-bold text-ink-900">Batas bayar pesanan transfer</h2>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-ink-500">Batalkan otomatis setelah</p>
+          <div className="flex h-9 items-center overflow-hidden rounded-lg border-[1.5px] border-ink-200">
+            <button
+              type="button"
+              aria-label="Kurangi jam"
+              className={stepBtn}
+              disabled={values.paymentWindowHours <= 1}
+              onClick={() => patch({ paymentWindowHours: values.paymentWindowHours - 1 })}
+            >
+              <MinusIcon className="size-[18px]" strokeWidth={2} />
+            </button>
+            <span className="w-10 text-center text-[15px] font-bold text-ink-900" aria-live="polite">
+              {values.paymentWindowHours}
+            </span>
+            <button
+              type="button"
+              aria-label="Tambah jam"
+              className={stepBtn}
+              disabled={values.paymentWindowHours >= 168}
+              onClick={() => patch({ paymentWindowHours: values.paymentWindowHours + 1 })}
+            >
+              <PlusIcon className="size-[18px]" strokeWidth={2} />
+            </button>
+          </div>
+          <p className="text-sm font-medium text-ink-900">jam</p>
+        </div>
+        {errors.paymentWindowHours ? <p className="text-xs font-medium text-error">{errors.paymentWindowHours}</p> : null}
+        <p className="text-xs text-ink-500">Usulan awal 24 jam. Sesuaikan dengan kebiasaan toko.</p>
+      </section>
 
-function Section({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="grid gap-4 border-b border-ink-200 pb-7 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-12">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-sans text-base leading-[19px] font-semibold text-ink-900">{title}</h2>
-        <p className="text-[13px] leading-[1.5] text-ink-500">{description}</p>
-      </div>
-      <div className="flex min-w-0 flex-col gap-4">{children}</div>
-    </section>
-  );
-}
+      <StickyBar>
+        <MButton size="lg" block loading={update.isPending} onClick={submit}>
+          <CheckIcon className="size-[18px]" />
+          Simpan pengaturan
+        </MButton>
+      </StickyBar>
 
-function BankLogo({ bank }: { bank: string }) {
-  const name = bank.trim().toUpperCase();
-  return (
-    <span
-      aria-hidden
-      className="flex h-9 w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[6px] px-1 text-xs leading-[15px] font-extrabold text-white"
-      style={{ backgroundColor: BANK_COLORS[name] ?? "var(--color-ink-700)" }}
-    >
-      {name.slice(0, 7)}
-    </span>
-  );
-}
-
-function BankAccountRow({
-  account,
-  onEdit,
-  onPrimary,
-}: {
-  account: BankAccount;
-  onEdit: () => void;
-  onPrimary: () => void;
-}) {
-  return (
-    <div className="flex items-center gap-4 rounded-[12px] border border-ink-200 p-[15px]">
-      <BankLogo bank={account.bank} />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="truncate font-[ui-monospace,SFMono-Regular,Menlo,Consolas,monospace] text-[15px] leading-5 font-semibold text-ink-900">
-          {account.number}
-        </span>
-        <span className="truncate text-[13px] leading-4 text-ink-600">a.n. {account.holder}</span>
-      </div>
-      {account.primary ? (
-        <span className="flex shrink-0 items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs leading-[15px] font-semibold text-brand-700">
-          <StarIcon className="size-3 fill-current" />
-          Utama
-        </span>
-      ) : (
-        <button
-          type="button"
-          onClick={onPrimary}
-          className="shrink-0 rounded-[6px] px-2.5 py-1 text-xs leading-[15px] font-semibold text-ink-600 outline-none hover:bg-ink-100 focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          Jadikan utama
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={onEdit}
-        aria-label={`Ubah rekening ${account.bank}`}
-        className="flex size-8 shrink-0 items-center justify-center rounded-[6px] text-ink-600 outline-none hover:bg-ink-100 focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
-        <PencilIcon className="size-[15px]" />
-      </button>
+      <SheetRoot open={hoursOpen} onOpenChange={setHoursOpen}>
+        <BottomSheet title="Jam operasional">
+          <div className="flex h-12 items-center gap-1 pr-2 pl-4">
+            <p className="flex-1 text-[17px] font-bold text-ink-900">Jam operasional</p>
+            <SheetClose aria-label="Tutup" className="flex size-10 items-center justify-center rounded-full text-ink-500">
+              <XIcon className="size-6" strokeWidth={1.8} />
+            </SheetClose>
+          </div>
+          <div className="flex flex-col overflow-y-auto px-4">
+            {DAYS.map((day) => {
+              const h = week[day];
+              const set = (next: Partial<typeof h>) => setWeek((w) => ({ ...w, [day]: { ...w[day], ...next } }));
+              return (
+                <div key={day} className="flex items-center gap-2 border-b border-ink-200 py-2.5 last:border-b-0">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={h.open}
+                    aria-label={`${day} buka`}
+                    onClick={() => set({ open: !h.open })}
+                    className={cn("relative h-[26px] w-11 shrink-0 rounded-full", h.open ? "bg-brand-600" : "bg-ink-300")}
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-[3px] size-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,.3)] transition-all",
+                        h.open ? "left-[21px]" : "left-[3px]",
+                      )}
+                    />
+                  </button>
+                  <p className="w-14 text-sm font-medium text-ink-900">{day}</p>
+                  {h.open ? (
+                    <div className="flex flex-1 items-center gap-1.5">
+                      <input
+                        type="time"
+                        aria-label={`${day} jam buka`}
+                        value={h.from}
+                        onChange={(e) => set({ from: e.target.value })}
+                        className="h-10 min-w-0 flex-1 rounded-lg border-[1.5px] border-ink-200 px-2 text-sm"
+                      />
+                      <span className="text-ink-500">–</span>
+                      <input
+                        type="time"
+                        aria-label={`${day} jam tutup`}
+                        value={h.to}
+                        onChange={(e) => set({ to: e.target.value })}
+                        className="h-10 min-w-0 flex-1 rounded-lg border-[1.5px] border-ink-200 px-2 text-sm"
+                      />
+                    </div>
+                  ) : (
+                    <p className="flex-1 text-sm text-ink-500">Tutup</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-2.5 border-t border-ink-200 px-4 pt-2.5 pb-[18px]">
+            <MButton
+              size="lg"
+              block
+              onClick={() => {
+                patch({ openingHours: serializeWeek(week) });
+                setHoursOpen(false);
+              }}
+            >
+              Terapkan
+            </MButton>
+          </div>
+        </BottomSheet>
+      </SheetRoot>
     </div>
-  );
-}
-
-function BankAccountEditor({
-  index,
-  account,
-  errors,
-  onChange,
-  onDone,
-  onRemove,
-}: {
-  index: number;
-  account: BankAccount;
-  errors: Errors;
-  onChange: (field: "bank" | "number" | "holder", value: string) => void;
-  onDone: () => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="grid gap-3 rounded-[12px] border border-ink-200 p-4 sm:grid-cols-[140px_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start">
-      <TextField
-        id={`bank-${index}`}
-        label="Bank"
-        value={account.bank}
-        placeholder="BCA"
-        error={errors[`bankAccounts.${index}.bank`]}
-        onChange={(v) => onChange("bank", v)}
-      />
-      <TextField
-        id={`number-${index}`}
-        label="Nomor rekening"
-        value={account.number}
-        placeholder="5270 8812 34"
-        inputMode="numeric"
-        error={errors[`bankAccounts.${index}.number`]}
-        onChange={(v) => onChange("number", v)}
-      />
-      <TextField
-        id={`holder-${index}`}
-        label="Atas nama"
-        value={account.holder}
-        placeholder="Budi Santoso"
-        error={errors[`bankAccounts.${index}.holder`]}
-        onChange={(v) => onChange("holder", v)}
-      />
-      <div className="flex gap-1 sm:mt-[22px]">
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-[42px] text-error hover:bg-error-soft hover:text-error"
-          onClick={onRemove}
-          aria-label={`Hapus rekening ${account.bank || index + 1}`}
-        >
-          <Trash2Icon />
-          <span className="sm:sr-only">Hapus</span>
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-[42px] text-ink-600"
-          onClick={onDone}
-          aria-label={`Selesai mengubah rekening ${account.bank || index + 1}`}
-        >
-          <CheckIcon />
-          <span className="sm:sr-only">Selesai</span>
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function TextField({
-  id,
-  label,
-  value,
-  placeholder,
-  error,
-  inputMode,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  placeholder?: string;
-  error?: string;
-  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Field data-invalid={Boolean(error)} className="gap-1.5">
-      <FieldLabel htmlFor={id} className={labelText}>
-        {label}
-      </FieldLabel>
-      <div className={cn(box, "items-center")}>
-        <input
-          id={id}
-          value={value}
-          placeholder={placeholder}
-          inputMode={inputMode}
-          aria-invalid={Boolean(error)}
-          onChange={(e) => onChange(e.target.value)}
-          className={boxControl}
-        />
-      </div>
-      {error ? <FieldError>{error}</FieldError> : null}
-    </Field>
   );
 }

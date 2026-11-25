@@ -7,7 +7,9 @@ type Handlers = { onLeft?: () => void; onRight?: () => void; threshold?: number 
 export function useSwipe<T extends HTMLElement>(handlers: Handlers) {
   const ref = useRef<T>(null);
   const latest = useRef(handlers);
-  latest.current = handlers;
+  useEffect(() => {
+    latest.current = handlers;
+  });
 
   useEffect(() => {
     const el = ref.current;

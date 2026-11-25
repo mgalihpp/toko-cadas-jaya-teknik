@@ -91,18 +91,13 @@ export function CheckoutForm({
 
   const [values, setValues] = useState<CheckoutValues>({
     ...defaults,
-    fulfillment: "ambil",
+    fulfillment: getPreferredFulfillment() ?? "ambil",
     address: "",
     paymentMethod: "transfer",
   });
   const [errors, setErrors] = useState<CheckoutErrors>({});
   const [conflict, setConflict] = useState<string | null>(null);
   const [adjusting, setAdjusting] = useState(false);
-
-  useEffect(() => {
-    const preferred = getPreferredFulfillment();
-    if (preferred) setValues((v) => ({ ...v, fulfillment: preferred }));
-  }, []);
 
   useEffect(() => {
     if (chosen.length === 0) router.replace("/keranjang");
