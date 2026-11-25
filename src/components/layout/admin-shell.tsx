@@ -188,7 +188,7 @@ function AdminDrawer({
             <span className="flex size-[52px] items-center justify-center rounded-full bg-white">
               <StoreIcon className="size-7 text-brand-600" strokeWidth={1.9} />
             </span>
-            <p className="text-base leading-[1.35] font-bold text-white">{user.name} · Cadas Jaya Teknik</p>
+            <p className="text-base leading-[1.35] font-bold text-white">{user.name}</p>
             <p className="text-[13px] leading-[1.35] text-[#CFE4F6]">{user.email}</p>
           </div>
           <nav aria-label="Menu admin" className="flex-1 overflow-y-auto py-2">
