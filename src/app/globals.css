@@ -149,14 +149,10 @@
 }
 
 @media print {
-  [data-slot="sidebar"],
-  [data-slot="sidebar-gap"],
-  [data-slot="sidebar-container"],
-  [data-slot="sidebar-wrapper"] header {
+  nav[aria-label="Navigasi admin"],
+  nav[aria-label="Navigasi utama"],
+  header {
     display: none !important;
-  }
-  [data-slot="sidebar-inset"] {
-    margin: 0 !important;
   }
 }
 

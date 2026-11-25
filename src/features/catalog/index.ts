@@ -21,7 +21,6 @@ export {
   ProductGridSkeleton,
 } from "./components/skeletons";
 export { CatalogLoadError, ProductNotFound } from "./components/status-views";
-export { CONTAINER } from "./components/container";
 export { useAddToCart } from "./hooks/use-add-to-cart";
 export {
   catalogHref,
