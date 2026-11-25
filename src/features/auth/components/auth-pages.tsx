@@ -56,18 +56,15 @@ async function AdminLoginGate() {
 
 function FormSkeleton({ fields }: { fields: number }) {
   return (
-    <div className="flex flex-col gap-6" aria-busy="true" aria-label="Memuat formulir">
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-10 w-40" />
-        <Skeleton className="h-4 w-64" />
-      </div>
+    <div className="flex flex-col gap-3.5 px-4 py-5" aria-busy="true" aria-label="Memuat formulir">
+      <Skeleton className="h-11 w-full rounded-xl" />
       {Array.from({ length: fields }, (_, index) => (
         <div key={index} className="flex flex-col gap-1.5">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-[42px] w-full" />
+          <Skeleton className="h-3.5 w-24" />
+          <Skeleton className="h-12 w-full rounded-[10px]" />
         </div>
       ))}
-      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-[50px] w-full rounded-[10px]" />
     </div>
   );
 }

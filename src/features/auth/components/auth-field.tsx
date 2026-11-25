@@ -1,69 +1,85 @@
 "use client";
 
+import { EyeIcon, EyeOffIcon, type LucideIcon } from "lucide-react";
 import { useState } from "react";
-import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 
 type AuthFieldProps = Omit<React.ComponentProps<"input">, "id" | "value" | "onChange"> & {
   id: string;
   label: string;
+  icon: LucideIcon;
   value: string;
   onValueChange: (value: string) => void;
   error?: string;
+  invalid?: boolean;
+  hint?: React.ReactNode;
 };
 
 export function AuthField({
   id,
   label,
+  icon: Icon,
   value,
   onValueChange,
   error,
+  invalid,
+  hint,
   type = "text",
   className,
   ...props
 }: AuthFieldProps) {
-  const [showPassword, setShowPassword] = useState(false);
+  const [show, setShow] = useState(false);
   const isPassword = type === "password";
-  const errorId = `${id}-error`;
-
+  const bad = Boolean(error) || Boolean(invalid);
   return (
-    <Field data-invalid={error ? true : undefined} className="gap-1.5">
-      <FieldLabel htmlFor={id} className="text-[13px] font-semibold text-ink-900">
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-[13px] font-medium text-ink-900">
         {label}
-      </FieldLabel>
-      <div className="relative">
-        <Input
+      </label>
+      <div
+        className={cn(
+          "flex h-12 items-center gap-2 rounded-[10px] bg-white px-3",
+          bad
+            ? "animate-[cjt-shake_.4s_ease-in-out] border-2 border-error"
+            : "border-[1.5px] border-ink-200 focus-within:border-2 focus-within:border-brand-600",
+        )}
+      >
+        <Icon className="size-5 shrink-0 text-ink-500" strokeWidth={1.8} />
+        <input
           id={id}
-          type={isPassword && showPassword ? "text" : type}
+          type={isPassword && show ? "text" : type}
           value={value}
           onChange={(event) => onValueChange(event.target.value)}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : undefined}
+          aria-invalid={bad || undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
           className={cn(
-            "h-[42px] rounded-md bg-white px-3 text-sm text-ink-900 aria-invalid:bg-error-soft",
-            isPassword && "pr-10",
+            "min-w-0 flex-1 bg-transparent text-[15px] text-ink-900 outline-none placeholder:text-ink-500",
             className,
           )}
           {...props}
         />
-        {isPassword && (
+        {isPassword ? (
           <button
             type="button"
-            onClick={() => setShowPassword((shown) => !shown)}
-            aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
-            className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-md text-ink-500 outline-none hover:text-ink-700 focus-visible:text-ink-900"
+            onClick={() => setShow((s) => !s)}
+            aria-label={show ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+            className="text-ink-500"
           >
-            {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+            {show ? (
+              <EyeOffIcon className="size-5" strokeWidth={1.8} />
+            ) : (
+              <EyeIcon className="size-5" strokeWidth={1.8} />
+            )}
           </button>
-        )}
+        ) : null}
       </div>
-      {error && (
-        <FieldError id={errorId} className="text-xs text-error">
+      {error ? (
+        <p id={`${id}-error`} className="text-xs font-medium text-error">
           {error}
-        </FieldError>
-      )}
-    </Field>
+        </p>
+      ) : hint ? (
+        <p className="text-xs font-medium text-ink-500">{hint}</p>
+      ) : null}
+    </div>
   );
 }
