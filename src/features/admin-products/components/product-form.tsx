@@ -383,17 +383,26 @@ function ProductForm({
             />
           </span>
         </button>
-        {product ? (
+      </section>
+
+      {product ? (
+        <section aria-labelledby="danger-zone" className="flex flex-col gap-3 border-y border-error-border bg-error-soft p-3">
+          <div className="flex flex-col gap-0.5">
+            <h2 id="danger-zone" className="text-sm font-bold text-error">
+              Zona berbahaya
+            </h2>
+            <p className="text-xs text-ink-700">Produk yang dihapus tidak bisa dikembalikan. Kalau hanya ingin menyembunyikan, matikan &quot;Tampilkan di katalog&quot;.</p>
+          </div>
           <button
             type="button"
             onClick={() => setDeleting(true)}
-            className="flex items-center gap-2 self-start text-sm font-bold text-error"
+            className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-error bg-white text-sm font-bold text-error active:bg-error-soft"
           >
             <Trash2Icon className="size-[18px]" />
             Hapus produk
           </button>
-        ) : null}
-      </section>
+        </section>
+      ) : null}
 
       <StickyBar>
         <MButton variant="outline" size="lg" block onClick={() => router.push("/admin/produk")}>
