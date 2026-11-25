@@ -1,4 +1,3 @@
-import { RefreshCwIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductCardSkeleton } from "@/features/catalog";
 import { HomeHeader, HomeNotice } from "./home-header";
@@ -33,12 +32,6 @@ export function HomeSkeleton() {
       <div className="grid grid-cols-2 gap-2.5 p-3">
         <ProductCardSkeleton />
         <ProductCardSkeleton />
-      </div>
-      <div className="pointer-events-none absolute inset-x-0 top-[92px] flex justify-center">
-        <div className="inline-flex items-center gap-1.5 rounded-2xl bg-toast px-2.5 py-[5px] text-[11px] font-medium text-white">
-          <RefreshCwIcon className="size-3.5 text-brand-300" />
-          Tarik ke bawah untuk muat ulang
-        </div>
       </div>
     </div>
   );
