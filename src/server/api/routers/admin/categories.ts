@@ -2,11 +2,13 @@ import { TRPCError } from "@trpc/server";
 import { asc, count, eq } from "drizzle-orm";
 import { z } from "zod";
 import { categories, products } from "@/server/db/schema";
+import { CATEGORY_ICON_KEYS } from "@/lib/category-icon-keys";
 import { randomSuffix, slugify } from "@/lib/slug";
 import { adminProcedure, createTRPCRouter } from "../../trpc";
 import type { Db } from "@/server/db";
 
 const nameInput = z.string().trim().min(2).max(80);
+const iconInput = z.enum(CATEGORY_ICON_KEYS).nullable().default(null);
 
 async function uniqueSlug(db: Db, name: string, ignoreId?: string) {
   const base = slugify(name) || "kategori";
@@ -24,6 +26,8 @@ export const adminCategoriesRouter = createTRPCRouter({
         id: categories.id,
         name: categories.name,
         slug: categories.slug,
+        icon: categories.icon,
+        updatedAt: categories.updatedAt,
         productCount: count(products.id),
       })
       .from(categories)
@@ -33,22 +37,23 @@ export const adminCategoriesRouter = createTRPCRouter({
   ),
 
   create: adminProcedure
-    .input(z.object({ name: nameInput }))
+    .input(z.object({ name: nameInput, icon: iconInput }))
     .mutation(async ({ ctx, input }) => {
       const [row] = await ctx.db
         .insert(categories)
-        .values({ name: input.name, slug: await uniqueSlug(ctx.db, input.name) })
+        .values({ name: input.name, icon: input.icon, slug: await uniqueSlug(ctx.db, input.name) })
         .returning();
       return row;
     }),
 
   update: adminProcedure
-    .input(z.object({ id: z.uuid(), name: nameInput }))
+    .input(z.object({ id: z.uuid(), name: nameInput, icon: iconInput }))
     .mutation(async ({ ctx, input }) => {
       const [row] = await ctx.db
         .update(categories)
         .set({
           name: input.name,
+          icon: input.icon,
           slug: await uniqueSlug(ctx.db, input.name, input.id),
         })
         .where(eq(categories.id, input.id))

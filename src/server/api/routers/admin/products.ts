@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, count, desc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   CONDITIONS,
@@ -21,6 +21,13 @@ const imageInput = z.object({
 
 const productFields = z.object({
   name: z.string().trim().min(2).max(150),
+  sku: z
+    .string()
+    .trim()
+    .max(40)
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .default(null),
   description: z.string().trim().max(5000).default(""),
   specs: z.record(z.string().min(1), z.string()).default({}),
   price: z.number().int().positive(),
@@ -43,6 +50,17 @@ async function uniqueSlug(
   return hit && hit.id !== ignoreId ? `${base}-${randomSuffix()}` : base;
 }
 
+async function assertSkuFree(db: Db, sku: string | null, ignoreId?: string) {
+  if (!sku) return;
+  const [hit] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.sku, sku), ignoreId ? ne(products.id, ignoreId) : undefined));
+  if (hit) {
+    throw new TRPCError({ code: "CONFLICT", message: "SKU sudah dipakai produk lain" });
+  }
+}
+
 export const adminProductsRouter = createTRPCRouter({
   list: adminProcedure
     .input(
@@ -50,6 +68,7 @@ export const adminProductsRouter = createTRPCRouter({
         q: z.string().trim().max(100).optional(),
         categoryId: z.uuid().optional(),
         isActive: z.boolean().optional(),
+        condition: z.enum(CONDITIONS).optional(),
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(100).default(20),
       })
@@ -59,11 +78,13 @@ export const adminProductsRouter = createTRPCRouter({
         input.q
           ? or(
               ilike(products.name, likePattern(input.q)),
-              ilike(products.description, likePattern(input.q))
+              ilike(products.description, likePattern(input.q)),
+              ilike(products.sku, likePattern(input.q))
             )
           : undefined,
         input.categoryId ? eq(products.categoryId, input.categoryId) : undefined,
-        input.isActive !== undefined ? eq(products.isActive, input.isActive) : undefined
+        input.isActive !== undefined ? eq(products.isActive, input.isActive) : undefined,
+        input.condition ? eq(products.condition, input.condition) : undefined
       );
       const [items, [{ total }]] = await Promise.all([
         ctx.db
@@ -71,6 +92,8 @@ export const adminProductsRouter = createTRPCRouter({
             id: products.id,
             name: products.name,
             slug: products.slug,
+            sku: products.sku,
+            thumbnailUrl: sql<string | null>`(select ${productImages.url} from ${productImages} where ${productImages.productId} = "products"."id" order by ${productImages.position} asc limit 1)`,
             price: products.price,
             condition: products.condition,
             isActive: products.isActive,
@@ -112,6 +135,7 @@ export const adminProductsRouter = createTRPCRouter({
     .input(productFields.extend({ stock: z.number().int().min(0).default(0) }))
     .mutation(async ({ ctx, input }) => {
       const { images, stock, ...fields } = input;
+      await assertSkuFree(ctx.db, fields.sku);
       return ctx.db.transaction(async (tx) => {
         const [product] = await tx
           .insert(products)
@@ -143,6 +167,7 @@ export const adminProductsRouter = createTRPCRouter({
     .input(productFields.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { id, images, ...fields } = input;
+      await assertSkuFree(ctx.db, fields.sku, id);
       return ctx.db.transaction(async (tx) => {
         const [product] = await tx
           .update(products)

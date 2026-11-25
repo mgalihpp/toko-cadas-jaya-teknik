@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LogIn, RotateCw, ShieldAlert, ShieldCheck, ShoppingCart, WifiOff } from "lucide-react";
+import { Check, LogIn, RotateCw, ShieldAlert,ShoppingCart, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ const steps = ["Keranjang", "Checkout", "Pembayaran"] as const;
 
 function CheckoutSteps() {
   return (
-    <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-5 lg:mb-12">
+    <div className="mb-8 flex flex-wrap items-center justify-center gap-4 border-b border-border pb-5 lg:mb-12">
       <ol className="flex items-center gap-2 sm:gap-3" aria-label="Langkah pemesanan">
         {steps.map((label, i) => {
           const done = i === 0;
@@ -64,10 +64,6 @@ function CheckoutSteps() {
           );
         })}
       </ol>
-      <p className="flex items-center gap-1.5 text-[13px] text-ink-600">
-        <ShieldCheck className="size-4 text-success" />
-        Data aman
-      </p>
     </div>
   );
 }

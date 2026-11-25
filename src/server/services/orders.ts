@@ -7,6 +7,7 @@ import {
   orderStatusLogs,
   products,
   stockLogs,
+  storeSettings,
 } from "@/server/db/schema";
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -19,7 +20,15 @@ export const UNPAID_STATUSES: OrderStatus[] = [
 
 export const PAID_STATUSES: OrderStatus[] = ["dibayar", "diproses", "selesai"];
 
-export const PAYMENT_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const DEFAULT_PAYMENT_WINDOW_HOURS = 24;
+
+export async function getPaymentWindowMs(client: Pick<typeof db, "select"> = db) {
+  const [row] = await client
+    .select({ hours: storeSettings.paymentWindowHours })
+    .from(storeSettings)
+    .limit(1);
+  return (row?.hours ?? DEFAULT_PAYMENT_WINDOW_HOURS) * 60 * 60 * 1000;
+}
 
 export function generateOrderCode(now = new Date()) {
   const date = now.toISOString().slice(0, 10).replaceAll("-", "");
@@ -194,7 +203,7 @@ export async function expireOverdueOrders() {
       ) {
         return;
       }
-      await cancelOrderInTx(tx, order, null, "Kedaluwarsa: tidak ada bukti pembayaran dalam 24 jam");
+      await cancelOrderInTx(tx, order, null, "Kedaluwarsa: batas waktu pembayaran terlewati");
     });
   }
   return overdue.length;

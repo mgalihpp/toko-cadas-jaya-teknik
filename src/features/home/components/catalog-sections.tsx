@@ -32,7 +32,7 @@ export async function CategoryStrip() {
     <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
       <ul className="flex min-w-max gap-2 sm:grid sm:min-w-0 sm:grid-cols-4 sm:gap-y-6 lg:grid-cols-8">
         {categories.map((category) => {
-          const Icon = categoryIcon(category.slug);
+          const Icon = categoryIcon(category.slug, category.icon);
           const photoClass =
             "size-[88px] rounded-full border border-ink-200 transition-colors group-hover:border-brand-500 lg:size-[100px]";
           return (

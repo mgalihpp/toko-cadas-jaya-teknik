@@ -1,11 +1,14 @@
 import { and, asc, count, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { z } from "zod";
-import { orders, payments, products } from "@/server/db/schema";
+import { alias } from "drizzle-orm/pg-core";
+import { categories, orderItems, orders, payments, products, users } from "@/server/db/schema";
 import { expireOverdueOrders } from "@/server/services/orders";
 import { adminProcedure, createTRPCRouter } from "../../trpc";
 import { available, pageCount } from "@/server/db/helpers";
 
 const range = z.object({ from: z.date(), to: z.date() });
+
+const confirmer = alias(users, "confirmer");
 
 export const adminFinanceRouter = createTRPCRouter({
   transactions: adminProcedure
@@ -31,6 +34,8 @@ export const adminFinanceRouter = createTRPCRouter({
           .select({
             id: payments.id,
             orderCode: orders.code,
+            customerName: orders.recipientName,
+            confirmedByName: confirmer.name,
             method: payments.method,
             amount: payments.amount,
             status: payments.status,
@@ -41,6 +46,7 @@ export const adminFinanceRouter = createTRPCRouter({
           })
           .from(payments)
           .innerJoin(orders, eq(orders.id, payments.orderId))
+          .leftJoin(confirmer, eq(confirmer.id, payments.confirmedBy))
           .where(where)
           .orderBy(desc(payments.createdAt))
           .limit(input.pageSize)
@@ -81,6 +87,37 @@ export const adminFinanceRouter = createTRPCRouter({
         transactions: rows.reduce((s, r) => s + r.transactions, 0),
       };
     }),
+
+  breakdown: adminProcedure.input(range).query(async ({ ctx, input }) => {
+    const paid = and(
+      eq(payments.status, "diterima"),
+      gte(payments.confirmedAt, input.from),
+      lt(payments.confirmedAt, input.to)
+    );
+    const revenue = sql<number>`coalesce(sum(${orderItems.unitPrice} * ${orderItems.quantity}), 0)::int`;
+    const units = sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int`;
+    const [byCategory, byProduct] = await Promise.all([
+      ctx.db
+        .select({ id: categories.id, name: categories.name, revenue, units })
+        .from(orderItems)
+        .innerJoin(payments, eq(payments.orderId, orderItems.orderId))
+        .innerJoin(products, eq(products.id, orderItems.productId))
+        .innerJoin(categories, eq(categories.id, products.categoryId))
+        .where(paid)
+        .groupBy(categories.id, categories.name)
+        .orderBy(desc(revenue))
+        .limit(10),
+      ctx.db
+        .select({ id: orderItems.productId, name: sql<string>`max(${orderItems.productName})`, revenue, units })
+        .from(orderItems)
+        .innerJoin(payments, eq(payments.orderId, orderItems.orderId))
+        .where(paid)
+        .groupBy(orderItems.productId)
+        .orderBy(desc(units), desc(revenue))
+        .limit(10),
+    ]);
+    return { byCategory, byProduct };
+  }),
 
   dashboard: adminProcedure.query(async ({ ctx }) => {
     await expireOverdueOrders();

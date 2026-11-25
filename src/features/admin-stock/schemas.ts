@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const LOW_STOCK = 2;
+
 export const ADJUST_MODES = ["tambah", "kurangi", "atur"] as const;
 export type AdjustMode = (typeof ADJUST_MODES)[number];
 

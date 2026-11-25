@@ -13,6 +13,7 @@ export const productFormSchema = z
       .trim()
       .min(2, "Nama produk minimal 2 karakter")
       .max(150, "Nama produk maksimal 150 karakter"),
+    sku: z.string().trim().max(40, "SKU maksimal 40 karakter"),
     description: z
       .string()
       .trim()

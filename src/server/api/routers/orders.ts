@@ -16,7 +16,7 @@ import {
   getOrderForUpdate,
   logStatus,
   lockStockForItems,
-  PAYMENT_WINDOW_MS,
+  getPaymentWindowMs,
 } from "@/server/services/orders";
 import { createTRPCRouter, customerProcedure } from "../trpc";
 import type { Db } from "@/server/db";
@@ -109,6 +109,7 @@ export const ordersRouter = createTRPCRouter({
           };
         });
 
+        const windowMs = await getPaymentWindowMs(tx);
         const total = lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
         const [order] = await tx
           .insert(orders)
@@ -123,7 +124,7 @@ export const ordersRouter = createTRPCRouter({
             total,
             expiresAt:
               input.paymentMethod === "transfer"
-                ? new Date(Date.now() + PAYMENT_WINDOW_MS)
+                ? new Date(Date.now() + windowMs)
                 : null,
           })
           .returning();

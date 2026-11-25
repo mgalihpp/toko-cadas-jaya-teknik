@@ -3,9 +3,9 @@ import { PAYMENT_STATUS_LABEL } from "../labels";
 import type { PaymentStatus } from "../types";
 
 const STATUS_CLASS: Record<PaymentStatus, string> = {
-  menunggu: "border-info-border bg-info-soft text-info",
-  diterima: "border-success-border bg-success-soft text-success",
-  ditolak: "border-error-border bg-error-soft text-error",
+  menunggu: "bg-info-soft text-info",
+  diterima: "bg-success-soft text-success",
+  ditolak: "bg-error-soft text-error",
 };
 
 export function PaymentStatusBadge({
@@ -18,7 +18,7 @@ export function PaymentStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex h-6 w-fit items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold whitespace-nowrap",
+        "inline-flex h-[23px] w-fit items-center gap-[5px] rounded-full px-2.5 text-xs font-semibold whitespace-nowrap",
         STATUS_CLASS[status],
         className
       )}

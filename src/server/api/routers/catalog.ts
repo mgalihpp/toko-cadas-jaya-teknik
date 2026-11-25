@@ -51,6 +51,7 @@ export const catalogRouter = createTRPCRouter({
           id: categories.id,
           name: categories.name,
           slug: categories.slug,
+          icon: categories.icon,
           productCount: count(products.id),
         })
         .from(categories)

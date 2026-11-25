@@ -8,6 +8,7 @@ import {
   Hourglass,
   Store,
   WifiOff,
+  XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback } from "react";
@@ -56,7 +57,7 @@ export function OrderDetail({ code }: { code: string }) {
   if (isError) {
     const notFound = error.data?.code === "NOT_FOUND";
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6">
+      <div className="mx-auto w-full min-h-[calc(100svh-64px)] max-w-[1440px] px-4 py-12 sm:px-6 lg:px-20 md:min-h-[calc(100svh-76px)]">
         <Empty className="border border-border">
           <EmptyHeader>
             {notFound ? (
@@ -94,7 +95,7 @@ export function OrderDetail({ code }: { code: string }) {
     canUploadProof(order) && order.expiresAt !== null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 md:py-10">
+    <div className="mx-auto w-full min-h-[calc(100svh-64px)] max-w-[1440px] px-4 py-8 sm:px-6 md:py-10 lg:px-20 md:min-h-[calc(100svh-76px)]">
       <Link
         href="/pesanan"
         className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-600 hover:text-ink-900"
@@ -187,8 +188,8 @@ function PaymentSection({ order }: { order: Order }) {
       <h2 className="text-[22px] font-semibold text-ink-900">Bukti transfer</h2>
       {order.status === "menunggu_konfirmasi" ? (
         <InfoBox icon={<Hourglass className="size-5" />} tone="info">
-          Bukti transfer sudah dikirim dan sedang diperiksa Owner. Status pesanan
-          akan berubah setelah pembayaran dikonfirmasi.
+          Bukti transfer Anda sudah kami terima dan sedang kami periksa. Status
+          pesanan akan diperbarui setelah pembayaran terkonfirmasi.
         </InfoBox>
       ) : order.status === "dibatalkan" ? (
         <InfoBox icon={<AlertCircle className="size-5" />} tone="error">
@@ -361,11 +362,11 @@ function CancelOrderButton({ code }: { code: string }) {
     <AlertDialog>
       <AlertDialogTrigger asChild>
         <Button
-          variant="ghost"
-          className="mt-4 w-fit px-0 text-sm font-semibold text-error hover:bg-transparent hover:text-error/80"
+          variant="outline"
+          className="mt-4 w-full border-error-border bg-white text-sm font-semibold text-error hover:bg-error-soft hover:text-error sm:w-fit"
           disabled={cancel.isPending}
         >
-          <AlertCircle /> Batalkan pesanan
+          <XCircle /> Batalkan pesanan
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
@@ -400,7 +401,7 @@ function CancelOrderButton({ code }: { code: string }) {
 function OrderDetailSkeleton() {
   return (
     <div
-      className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 md:py-10"
+      className="mx-auto w-full min-h-[calc(100svh-64px)] max-w-[1440px] px-4 py-8 sm:px-6 md:py-10 lg:px-20 md:min-h-[calc(100svh-76px)]"
       aria-busy="true"
       aria-label="Memuat pesanan"
     >

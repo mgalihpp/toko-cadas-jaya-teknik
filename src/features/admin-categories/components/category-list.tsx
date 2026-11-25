@@ -5,7 +5,7 @@ import { FolderIcon, InfoIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-r
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
-import { EmptyState, ErrorState, PageHeader } from "@/components/shared";
+import { EmptyState, ErrorState } from "@/components/shared";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -27,31 +27,42 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { CategoryDialog, type CategoryDialogState } from "./category-dialog";
+import { CategoryIcon } from "./category-icon";
 
 type Category = { id: string; name: string; productCount: number };
+
+const headClass = "h-auto px-2 py-2.5 text-xs leading-[15px] font-semibold text-ink-500";
 
 export function CategoryList() {
   const trpc = useTRPC();
   const categories = useQuery(trpc.admin.categories.list.queryOptions());
-  const [dialog, setDialog] = useState<CategoryDialogState>(null);
   const [toDelete, setToDelete] = useState<Category | null>(null);
 
   const addButton = (
-    <Button size="lg" onClick={() => setDialog({ mode: "create" })}>
-      <PlusIcon />
-      Tambah Kategori
+    <Button asChild className="h-[37px] gap-2 rounded-[8px] px-4 font-semibold">
+      <Link href="/admin/kategori/baru">
+        <PlusIcon />
+        Tambah Kategori
+      </Link>
     </Button>
   );
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Kategori"
-        description={categories.data ? `${categories.data.length} kategori` : "Memuat kategori..."}
-        actions={addButton}
-      />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-0.5">
+          <h1 className="font-heading text-[26px] leading-[33px] font-bold tracking-[-0.6px] text-ink-900">
+            Kategori
+          </h1>
+          <p className="text-[13px] leading-4 text-ink-500">
+            {categories.data ? `${categories.data.length} kategori` : "Memuat kategori..."}
+          </p>
+        </div>
+        {addButton}
+      </div>
 
       {categories.isError ? (
         <ErrorState description={categories.error.message} onRetry={() => categories.refetch()} />
@@ -63,71 +74,93 @@ export function CategoryList() {
           action={addButton}
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-ink-200 bg-white">
-          <Table>
-            <TableHeader className="bg-ink-50">
-              <TableRow>
-                <TableHead className="pl-4">Nama</TableHead>
-                <TableHead>Slug</TableHead>
-                <TableHead className="text-right">Produk</TableHead>
-                <TableHead className="w-24 pr-4">
-                  <span className="sr-only">Aksi</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {categories.data
-                ? categories.data.map((c) => (
-                    <TableRow key={c.id}>
-                      <TableCell className="pl-4 font-medium text-ink-900">{c.name}</TableCell>
-                      <TableCell className="font-mono text-xs text-ink-500">/{c.slug}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {c.productCount > 0 ? (
-                          c.productCount
-                        ) : (
-                          <span className="text-ink-500">0</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="pr-4">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => setDialog({ mode: "edit", id: c.id, name: c.name })}
-                            aria-label={`Ubah ${c.name}`}
+        <>
+          <div className="overflow-hidden rounded-[12px] border border-ink-200 bg-white">
+            <Table>
+              <TableHeader className="bg-ink-50">
+                <TableRow className="border-ink-200 hover:bg-transparent">
+                  <TableHead className={cn(headClass, "pl-5")}>Nama</TableHead>
+                  <TableHead className={cn(headClass, "w-[236px]")}>Slug</TableHead>
+                  <TableHead className={cn(headClass, "w-[116px]")}>Produk</TableHead>
+                  <TableHead className={cn(headClass, "w-[136px]")}>Diubah</TableHead>
+                  <TableHead className={cn(headClass, "w-[118px] pr-5")}>
+                    <span className="sr-only">Aksi</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {categories.data
+                  ? categories.data.map((c) => {
+                      const used = c.productCount > 0;
+                      return (
+                        <TableRow key={c.id} className="h-[59px] border-ink-200">
+                          <TableCell className="py-[11.5px] pr-2 pl-5">
+                            <div className="flex items-center gap-3">
+                              <span className="flex size-9 shrink-0 items-center justify-center rounded-[8px] bg-ink-100 text-ink-700">
+                                <CategoryIcon slug={c.slug} icon={c.icon} className="size-[17px]" />
+                              </span>
+                              <span className="text-sm font-semibold text-ink-900">{c.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-2 py-[11.5px] font-mono text-[13px] text-ink-500">
+                            /{c.slug}
+                          </TableCell>
+                          <TableCell
+                            className={cn(
+                              "px-2 py-[11.5px] text-sm font-medium tabular-nums",
+                              used ? "text-ink-900" : "text-ink-500"
+                            )}
                           >
-                            <PencilIcon />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-error hover:bg-error-soft hover:text-error"
-                            onClick={() => setToDelete(c)}
-                            aria-label={`Hapus ${c.name}`}
-                          >
-                            <Trash2Icon />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                : Array.from({ length: 5 }, (_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={4} className="px-4">
-                        <Skeleton className="h-7 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-            </TableBody>
-          </Table>
-          <p className="flex items-center gap-2 border-t border-ink-200 bg-ink-50 px-4 py-3 text-sm text-ink-600">
+                            {c.productCount}
+                          </TableCell>
+                          <TableCell className="px-2 py-[11.5px] text-[13px] text-ink-500">
+                            {formatDate(c.updatedAt)}
+                          </TableCell>
+                          <TableCell className="py-[11.5px] pr-5 pl-2">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                asChild
+                                variant="ghost"
+                                className="size-[30px] rounded-[6px] p-0 text-ink-600 [&_svg:not([class*='size-'])]:size-[15px]"
+                              >
+                                <Link href={`/admin/kategori/${c.id}`} aria-label={`Ubah ${c.name}`}>
+                                  <PencilIcon />
+                                </Link>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                className={cn(
+                                  "size-[30px] rounded-[6px] p-0 hover:bg-error-soft hover:text-error [&_svg:not([class*='size-'])]:size-[15px]",
+                                  used ? "text-ink-300" : "text-error"
+                                )}
+                                onClick={() => setToDelete(c)}
+                                aria-label={`Hapus ${c.name}`}
+                                title={used ? "Masih dipakai produk" : undefined}
+                              >
+                                <Trash2Icon />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  : Array.from({ length: 5 }, (_, i) => (
+                      <TableRow key={i} className="h-[59px] border-ink-200">
+                        <TableCell colSpan={5} className="px-5">
+                          <Skeleton className="h-9 w-full" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+              </TableBody>
+            </Table>
+          </div>
+          <p className="flex items-center gap-2.5 rounded-[10px] bg-ink-50 p-3.5 text-[13px] leading-4 text-ink-600">
             <InfoIcon className="size-4 shrink-0 text-ink-500" />
             Kategori yang masih dipakai produk tidak bisa dihapus. Pindahkan produknya dulu.
           </p>
-        </div>
+        </>
       )}
 
-      <CategoryDialog state={dialog} onOpenChange={(open) => !open && setDialog(null)} />
       <DeleteCategoryDialog category={toDelete} onClose={() => setToDelete(null)} />
     </div>
   );

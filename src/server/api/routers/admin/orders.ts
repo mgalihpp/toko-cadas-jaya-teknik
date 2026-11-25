@@ -1,8 +1,9 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, count, desc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   ORDER_STATUSES,
+  orderItems,
   orders,
   orderStatusLogs,
   payments,
@@ -13,7 +14,7 @@ import {
   getOrderForUpdate,
   logStatus,
   markPaidInTx,
-  PAYMENT_WINDOW_MS,
+  getPaymentWindowMs,
 } from "@/server/services/orders";
 import { adminProcedure, createTRPCRouter } from "../../trpc";
 import { likePattern, pageCount } from "@/server/db/helpers";
@@ -47,6 +48,10 @@ export const adminOrdersRouter = createTRPCRouter({
             id: orders.id,
             code: orders.code,
             recipientName: orders.recipientName,
+            phone: orders.phone,
+            itemCount: sql<number>`(select coalesce(sum(${orderItems.quantity}), 0)::int from ${orderItems} where ${orderItems.orderId} = "orders"."id")`,
+            firstItem: sql<string | null>`(select ${orderItems.productName} from ${orderItems} where ${orderItems.orderId} = "orders"."id" order by ${orderItems.id} limit 1)`,
+            lineCount: sql<number>`(select count(*)::int from ${orderItems} where ${orderItems.orderId} = "orders"."id")`,
             paymentMethod: orders.paymentMethod,
             fulfillment: orders.fulfillment,
             status: orders.status,
@@ -167,7 +172,7 @@ export const adminOrdersRouter = createTRPCRouter({
           .where(and(eq(payments.orderId, order.id), eq(payments.status, "menunggu")));
         await tx
           .update(orders)
-          .set({ expiresAt: new Date(Date.now() + PAYMENT_WINDOW_MS) })
+          .set({ expiresAt: new Date(Date.now() + (await getPaymentWindowMs(tx))) })
           .where(eq(orders.id, order.id));
         await logStatus(
           tx,

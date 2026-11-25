@@ -17,6 +17,7 @@ export const categories = pgTable("categories", {
   id: uuid().primaryKey().defaultRandom(),
   name: text().notNull(),
   slug: text().notNull().unique(),
+  icon: text(),
   ...timestamps,
 });
 
@@ -26,6 +27,7 @@ export const products = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     name: text().notNull(),
     slug: text().notNull().unique(),
+    sku: text().unique(),
     description: text().notNull().default(""),
     specs: jsonb().$type<Record<string, string>>().notNull().default({}),
     price: integer().notNull(),

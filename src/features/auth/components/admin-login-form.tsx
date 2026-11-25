@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CircleXIcon, LockIcon } from "lucide-react";
+import { CircleXIcon, CogIcon, LockIcon } from "lucide-react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { authErrorMessage } from "../lib";
 import { fieldErrorsOf, loginSchema, type FieldErrors, type LoginInput } from "../schemas";
 import { AuthField } from "./auth-field";
-import { BrandMark } from "./auth-shell";
 
 const NOT_ADMIN = "Akun ini tidak punya akses ke panel admin.";
 
@@ -60,17 +59,19 @@ export function AdminLoginForm() {
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="flex w-full max-w-[420px] flex-col gap-6 rounded-2xl border border-border bg-white p-6 sm:p-10"
+        className="flex w-full max-w-[420px] flex-col gap-6 rounded-2xl border border-ink-200 bg-white p-6 shadow-[0_8px_32px_rgba(28,25,23,0.06)] sm:p-[39px] [&_label]:leading-4"
       >
         <div className="flex items-center gap-2.5">
-          <BrandMark size="lg" />
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-600 text-white">
+            <CogIcon className="size-[22px]" aria-hidden />
+          </span>
           <div className="flex flex-col">
-            <span className="font-heading text-[17px] font-bold text-ink-900">Cadas Jaya Teknik</span>
-            <span className="text-xs text-ink-500">Panel Owner</span>
+            <span className="font-heading text-[17px] leading-[22px] font-bold text-ink-900">Cadas Jaya Teknik</span>
+            <span className="text-xs leading-[15px] text-ink-500">Panel Owner</span>
           </div>
         </div>
 
-        <h1 className="font-heading text-[28px] font-bold text-ink-900">Masuk ke panel</h1>
+        <h1 className="font-heading text-[28px] leading-9 font-bold tracking-[-0.6px] text-ink-900">Masuk ke panel</h1>
 
         {formError && (
           <div
@@ -92,6 +93,7 @@ export function AdminLoginForm() {
           value={values.email}
           onValueChange={(value) => setField("email", value)}
           error={errors.email}
+          className="aria-invalid:bg-white"
           disabled={pending}
         />
         <AuthField
@@ -103,13 +105,15 @@ export function AdminLoginForm() {
           value={values.password}
           onValueChange={(value) => setField("password", value)}
           error={errors.password}
+          aria-invalid={errors.password || formError ? true : undefined}
+          className="aria-invalid:bg-white"
           disabled={pending}
         />
 
         <Button
           type="submit"
           disabled={pending}
-          className="h-[46px] w-full bg-ink-900 text-sm font-semibold text-white hover:bg-ink-800"
+          className="h-[46px] w-full rounded-md bg-ink-900 text-sm font-semibold text-white hover:bg-ink-800"
         >
           {pending && <Spinner />}
           {pending ? "Memproses..." : "Masuk"}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { HistoryIcon } from "lucide-react";
+import { HistoryIcon, LockIcon, LockOpenIcon, MinusIcon, PlusIcon, type LucideIcon } from "lucide-react";
 import { EmptyState, ErrorState } from "@/components/shared";
 import {
   Sheet,
@@ -17,17 +17,19 @@ import { useTRPC } from "@/trpc/client";
 
 type Reason = "penyesuaian" | "kunci" | "lepas" | "terjual";
 
-function describe(reason: Reason, change: number) {
+function describe(reason: Reason, change: number): { label: string; icon: LucideIcon; tone: string } {
   const n = Math.abs(change);
   switch (reason) {
     case "kunci":
-      return `Dikunci ${n}`;
+      return { label: `Dikunci ${n}`, icon: LockIcon, tone: "text-info" };
     case "lepas":
-      return `Dilepas ${n}`;
+      return { label: `Dilepas ${n}`, icon: LockOpenIcon, tone: "text-ink-600" };
     case "terjual":
-      return `Terjual ${n}`;
+      return { label: `Terjual ${n}`, icon: MinusIcon, tone: "text-error" };
     default:
-      return change >= 0 ? `Ditambah ${n}` : `Dikurangi ${n}`;
+      return change >= 0
+        ? { label: `Ditambah ${n}`, icon: PlusIcon, tone: "text-success" }
+        : { label: `Dikurangi ${n}`, icon: MinusIcon, tone: "text-error" };
   }
 }
 
@@ -42,10 +44,10 @@ export function StockHistorySheet({
     <Sheet open={product !== null} onOpenChange={onOpenChange}>
       <SheetContent className="w-full gap-0 sm:max-w-md">
         <SheetHeader className="border-b border-ink-200">
-          <SheetTitle>Riwayat stok</SheetTitle>
-          <SheetDescription className="truncate">{product?.name}</SheetDescription>
+          <SheetTitle className="font-heading text-lg font-semibold text-ink-900">Riwayat stok</SheetTitle>
+          <SheetDescription className="truncate text-[13px] text-ink-500">{product?.name}</SheetDescription>
         </SheetHeader>
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto px-4 pb-4">
           {product ? <HistoryList productId={product.id} /> : null}
         </div>
       </SheetContent>
@@ -62,7 +64,7 @@ function HistoryList({ productId }: { productId: string }) {
   }
   if (!logs.data) {
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 pt-4">
         {Array.from({ length: 5 }, (_, i) => (
           <Skeleton key={i} className="h-14 w-full" />
         ))}
@@ -82,34 +84,24 @@ function HistoryList({ productId }: { productId: string }) {
   return (
     <ol className="flex flex-col">
       {logs.data.map((log) => {
-        const positive = log.reason === "lepas" || (log.reason === "penyesuaian" && log.change > 0);
+        const { label, icon: Icon, tone } = describe(log.reason, log.change);
+        const detail = log.note ?? (log.orderId ? "Dari pesanan" : null);
         return (
-          <li key={log.id} className="flex gap-3 border-b border-ink-100 py-3 last:border-0">
-            <span
-              className={cn(
-                "mt-1.5 size-2 shrink-0 rounded-full",
-                positive ? "bg-success" : log.reason === "kunci" ? "bg-warning" : "bg-brand-500"
-              )}
-              aria-hidden
-            />
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-sm font-semibold text-ink-900">
-                {describe(log.reason, log.change)}
-              </span>
-              {log.note ? <span className="text-sm text-ink-600">{log.note}</span> : null}
-              {log.orderId && !log.note ? (
-                <span className="text-sm text-ink-600">Dari pesanan</span>
-              ) : null}
-              <span className="text-xs text-ink-500">
+          <li key={log.id} className="flex items-start gap-3.5 border-b border-ink-200 py-2.5">
+            <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-ink-100">
+              <Icon className={cn("size-3.5", tone)} />
+            </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-1.5">
+              <span className={cn("text-sm leading-[17px] font-semibold", tone)}>{label}</span>
+              {detail ? <span className="text-sm text-ink-600">{detail}</span> : null}
+              <span className="text-xs leading-[15px] text-ink-500">
                 {formatDateTime(log.createdAt)} oleh {log.actorName ?? "sistem"}
               </span>
             </div>
           </li>
         );
       })}
-      <li className="pt-3 text-xs text-ink-500">
-        Menampilkan {logs.data.length} perubahan terakhir.
-      </li>
+      <li className="pt-3 text-xs text-ink-500">Menampilkan {logs.data.length} perubahan terakhir.</li>
     </ol>
   );
 }

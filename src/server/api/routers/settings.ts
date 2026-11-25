@@ -9,11 +9,14 @@ const settingsInput = z.object({
         bank: z.string().trim().min(1),
         number: z.string().trim().min(1),
         holder: z.string().trim().min(1),
+        primary: z.boolean().optional(),
       })
     )
     .max(10),
   address: z.string().trim().max(500),
   phone: z.string().trim().max(30),
+  email: z.union([z.literal(""), z.email().max(120)]),
+  paymentWindowHours: z.number().int().min(1).max(168),
   openingHours: z.string().trim().max(300),
 });
 
@@ -26,6 +29,8 @@ export const settingsRouter = createTRPCRouter({
         bankAccounts: [],
         address: "",
         phone: "",
+        email: "",
+        paymentWindowHours: 24,
         openingHours: "",
         updatedAt: new Date(0),
       }

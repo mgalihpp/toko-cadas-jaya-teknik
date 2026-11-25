@@ -114,23 +114,19 @@ export function AdminDashboard() {
             <Kpi
               label="Penjualan"
               value={sales.data ? formatRupiah(sales.data.total) : undefined}
-              hint={sales.data ? `${sales.data.transactions} transaksi, 30 hari terakhir` : "30 hari terakhir"}
             />
             <Kpi
               label="Pesanan perlu diproses"
               value={d?.inProcess}
-              hint={d ? `${d.awaitingPayment} menunggu pembayaran` : undefined}
             />
             <Kpi
               label="Menunggu konfirmasi"
               value={d?.awaitingConfirmation}
-              hint="bukti transfer perlu dicek"
               tone={d && d.awaitingConfirmation > 0 ? "info" : undefined}
             />
             <Kpi
               label="Stok menipis"
               value={d?.lowStock.length}
-              hint="tersedia 2 unit atau kurang"
               tone={d && d.lowStock.length > 0 ? "warning" : undefined}
             />
           </div>
@@ -229,12 +225,10 @@ export function AdminDashboard() {
 function Kpi({
   label,
   value,
-  hint,
   tone,
 }: {
   label: string;
   value: React.ReactNode | undefined;
-  hint?: string;
   tone?: "info" | "warning";
 }) {
   return (
@@ -253,7 +247,6 @@ function Kpi({
           {value}
         </span>
       )}
-      {hint ? <span className="text-xs text-ink-500">{hint}</span> : null}
     </div>
   );
 }
